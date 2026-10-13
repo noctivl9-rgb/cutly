@@ -1,56 +1,55 @@
 # CUTLY — état de préparation à la production
 
-Dernière vérification du code local : 13 octobre 2026.
+Dernière vérification locale : 13 octobre 2026.
 
-## État global
+## État
 
-**PRÉPARATION TECHNIQUE EN COURS — PAS PRÊT POUR UN LANCEMENT PUBLIC.**
+**Préparation en cours — CUTLY n’est pas encore prêt à recevoir des clients.** Le code est publié sur GitHub, le serveur local répond, et les contrôles locaux passent. Aucun service Render, aucune base PostgreSQL de production, aucun domaine ni fournisseur transactionnel n’est configuré.
 
-Le code de préparation PostgreSQL et le Blueprint Render sont présents, mais aucune connexion, base Render, ressource d’hébergement, adresse publique ou publication n’existe. Aucun achat ou abonnement n’a été effectué.
-
-| Domaine | État | Vérification |
+| Domaine | État | Détail |
 |---|---|---|
-| Réservation, administration, paiements sur place, fidélité et avis | PARTIELLEMENT VÉRIFIÉ | Couvert par les tests locaux SQLite; pas de validation sur PostgreSQL réel. |
-| Vérification d’identité par e-mail/SMS | NON CONFIGURÉ | Adaptateurs Resend/Twilio présents; pas de compte, clé ni envoi réel. |
-| PostgreSQL | PRÉPARÉ, NON TESTÉ SUR SERVEUR | Schéma, adaptateur et script de migration écrits; aucune URL ni instance PostgreSQL accessible. |
-| Migration SQLite réelle | NON EXÉCUTÉE | La base et les données locales n’ont pas été modifiées; aucune sauvegarde réelle n’a été créée par cette préparation. |
-| Render | PRÉPARÉ, NON CRÉÉ | Blueprint configuré avec ressources payantes; il n’a pas été synchronisé. |
-| Multi-établissement / équipe | PARTIEL | Le schéma porte l’établissement; les routes sont encore centrées sur Thomas Shop et les rendez-vous n’ont pas d’identifiant professionnel distinct. |
-| Domaine et HTTPS | EN ATTENTE | Nom de domaine non choisi; URL publique absente. |
-| Administrateur de production | EN ATTENTE | L’initialisation sécurisée est disponible; l’adresse réelle et le secret MFA de production ne sont pas renseignés. |
-| RGPD | VALIDATION REQUISE | Brouillon et export de données présents; conservation, suppression/anonymisation, sous-traitants et textes nécessitent validation juridique. |
-| Sauvegardes et alertes | PARTIELLEMENT PRÉPARÉ | Sauvegarde SQLite vérifiée en test temporaire; aucune sauvegarde de production, rétention hors site, surveillance ou alerte n’est configurée. |
-| Git distant | BLOQUÉ | Aucun dépôt Git distant configuré dans cet espace. |
+| Dépôt GitHub | PRÉPARÉ ET PUBLIÉ | `https://github.com/noctivl9-rgb/cutly`, branche `main`, commit de référence `e419771`. Dépôt public. |
+| Contrôles locaux | RÉUSSIS | `npm run check`, 25 tests, `npm audit --omit=dev` : 0 vulnérabilité signalée. |
+| Serveur local | OPÉRATIONNEL | `/healthz` répond 200. `/api/status` répond 200 et signale la réservation bloquée. |
+| Réservations | TESTÉES SUR SQLITE | Couverture locale des créneaux, règles, concurrence et transitions. Pas de validation PostgreSQL réelle. |
+| Administrateur local | INITIALISÉ | MFA configuré selon `/api/status`; cela ne configure pas un administrateur de production. |
+| E-mail et SMS | NON CONFIGURÉS | Resend et Twilio absents; la double vérification et la réservation restent bloquées. |
+| PostgreSQL | PRÉPARÉ, NON TESTÉ | Adaptateur et migration écrits; aucune instance PostgreSQL disponible pour tester. |
+| Migration des données | NON EXÉCUTÉE | La base SQLite locale demeure intacte; migration réelle et sauvegarde pré-migration restent à faire. |
+| Render | PRÉPARÉ, NON CRÉÉ | `render.yaml` prévoit un web service et PostgreSQL payants. Aucun compte/service n’a été connecté ou créé. |
+| Domaine/HTTPS | EN ATTENTE | Domaine à choisir; URL HTTPS publique non configurée. |
+| RGPD | VALIDATION REQUISE | Conservation, anonymisation/suppression, sous-traitants et textes doivent être validés juridiquement. |
+| Sauvegardes et surveillance | PARTIELLEMENT PRÉPARÉ | Scripts et procédure présents; aucune sauvegarde ou restauration PostgreSQL de production, alerte ou supervision active. |
 
-## Vérifications locales exécutées
+## Vérifications réellement exécutées
 
-- npm run check : réussi.
-- npm test : 25 tests réussis, 0 échec.
-- npm audit --omit=dev : 0 vulnérabilité signalée dans les dépendances de production.
-- Les tests tournent sur SQLite temporaire. Ils ne prouvent ni une connexion PostgreSQL, ni un envoi Resend/Twilio, ni un déploiement, ni une restauration de production.
-- Aucun build de production séparé ou test multi-navigateurs réel n’a été effectué dans cette passe.
+- `npm run check` : réussite.
+- `npm test` : 25 tests réussis, 0 échec.
+- `npm audit --omit=dev` : 0 vulnérabilité signalée.
+- `GET /healthz` : HTTP 200, `{"status":"ok"}`.
+- `GET /api/status` : HTTP 200; `booking=BLOCKED`, fournisseurs e-mail/SMS et URL HTTPS non configurés, base `SQLITE_LOCAL`.
+- La suite de tests n’a pas utilisé une base PostgreSQL ni envoyé de véritables e-mails/SMS.
 
-## Coûts et services
+## Coûts et limite du zéro euro
 
-Le Blueprint demande un service web et un PostgreSQL managé sur des plans payants. Estimation Render vérifiée le 13 octobre 2026 : environ 7 USD/mois pour le web, 19 USD/mois pour PostgreSQL et 1,20 USD/mois pour le stockage configuré de 5 GB (premier GB inclus), soit environ 27,20 USD/mois hors taxes éventuelles, trafic excédentaire, Resend, Twilio et domaine. Revalider dans la console avant création. Aucun engagement financier n’a été pris.
+Le Blueprint actuel demande des plans Render payants. Au relevé officiel du 13 octobre 2026, les plans configurés représentent environ 7 USD/mois pour le web, 19 USD/mois pour PostgreSQL 0,5 CPU/1 GB, puis 1,20 USD/mois pour les 4 GB de stockage au-delà du premier GB inclus : environ **27,20 USD/mois**, hors taxes, trafic et fournisseurs. Le plan Hobby de l’espace Render est à 0 USD/mois; le compute s’ajoute.
 
-Render indique que la récupération PITR PostgreSQL est réservée aux plans payants et que la fenêtre dépend du plan d’espace. Les exports logiques manuels sont temporaires. Définir et tester une sauvegarde indépendante avant exploitation : [documentation des sauvegardes Render](https://render.com/docs/postgresql-backups).
+Render propose aussi des ressources gratuites, mais elles ne conviennent pas aux données de réservation en production : le service web gratuit s’endort après 15 minutes d’inactivité et le PostgreSQL gratuit expire après 30 jours. Après une période de grâce de 14 jours, Render supprime la base; le plan gratuit n’inclut pas de sauvegardes. Ne pas y importer les données réelles de CUTLY.
 
-## Éléments à fournir ou réaliser avant d’ouvrir CUTLY aux clients
+Sources officielles : [tarifs Render](https://render.com/pricing), [plans compute](https://render.com/docs/compute-plans), [limitations du niveau gratuit](https://render.com/docs/free).
 
-1. Créer un dépôt Git privé et connecter le compte Render, après validation du coût courant des ressources.
-2. Choisir le domaine et configurer DNS.
-3. Créer/configurer les comptes Resend et Twilio si souhaité; entrer les secrets uniquement dans un gestionnaire de secrets.
-4. Décider si les données SQLite existantes doivent être transférées, inspecter les comptes/réservations de la source, puis utiliser une sauvegarde vérifiée et le runbook de migration. La base PostgreSQL doit rester vide avant le premier démarrage de l’application.
-5. Réaliser la migration et vérifier réellement les données et contraintes sur une base PostgreSQL.
-6. Initialiser et tester le compte administrateur final avec MFA.
-7. Faire valider juridiquement la notice, les traitements, les sous-traitants, la conservation et les demandes de droits.
-8. Définir rétention et procédure de sauvegarde/restauration, surveillance, alertes et plan de récupération.
-9. Tester les parcours de bout en bout et l’accessibilité sur appareils et navigateurs retenus.
-10. Autoriser distinctement le déploiement public et toute dépense liée aux services.
+## À terminer avant ouverture aux clients
 
-## Démarrage local
+1. Décider entre coûts Render payants pour une base durable ou une démo gratuite temporaire sans données réelles.
+2. Configurer Resend et Twilio, vérifier l’expéditeur et placer les secrets dans Render.
+3. Choisir et configurer le domaine HTTPS.
+4. Créer la base PostgreSQL, sauvegarder et inspecter les données SQLite, puis exécuter et vérifier la migration.
+5. Tester le schéma, les transactions, les contraintes et les parcours sur une instance PostgreSQL réelle.
+6. Initialiser l’administrateur de production et confirmer le MFA, sans réutiliser les identifiants de démonstration.
+7. Valider juridiquement les notices, durées de conservation, sous-traitants et parcours des droits RGPD.
+8. Mettre en place sauvegardes indépendantes, restauration testée, alertes et procédure d’incident.
+9. Exécuter les tests de bout en bout sur l’environnement de validation, puis autoriser distinctement le déploiement public.
 
-L’adresse locale est http://127.0.0.1:3000. Pour lancer l’application depuis le dossier du projet : npm start. Cela ne rend pas le site public.
+## Lancement local
 
-Voir [README.md](README.md), [déploiement Render](docs/DEPLOYMENT.md), [migration PostgreSQL](docs/POSTGRESQL_MIGRATION.md), [sauvegarde/restauration](docs/BACKUP_RESTORE.md) et [configuration des fournisseurs](docs/PROVIDERS.md).
+Depuis la racine du dépôt : `npm start`, puis ouvrir `http://127.0.0.1:3000`. Cette adresse n’est pas publique. Le statut actuel est consultable sur `/api/status`.

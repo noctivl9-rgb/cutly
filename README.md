@@ -1,36 +1,32 @@
 # CUTLY
 
-Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite natif pour le développement local et un adaptateur PostgreSQL préparé pour Render. La base SQLite locale est conservée; aucun service externe n’est configuré par défaut.
+Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite natif en développement local et PostgreSQL en production. Le site n’est pas encore déployé publiquement.
 
 ## Démarrage local
 
     npm start
 
-Ouvrir http://127.0.0.1:3000. Le serveur local utilise data/cutly.sqlite. Ce lien ne donne pas accès au site depuis Internet.
+Ouvrir http://127.0.0.1:3000. Cette adresse n’est accessible que depuis l’environnement local. La base locale se trouve dans `data/cutly.sqlite`.
 
 ## Vérifications
 
     npm run check
     npm test
 
-Les tests utilisent des bases temporaires SQLite. Ils couvrent les règles de réservation, la vérification client, les autorisations admin et MFA, les annulations, les paiements et leurs corrections, la fidélité, les récompenses, les avis et la sérialisation de réservations concurrentes dans l’adaptateur SQLite. Ils ne remplacent pas des tests PostgreSQL réels.
+Les tests utilisent SQLite temporaire. Ils ne remplacent pas les essais sur PostgreSQL réel, l’envoi de véritables e-mails/SMS ni les vérifications en production.
 
 ## Compte administrateur
 
-Le script npm run bootstrap:admin initialise le premier compte admin après démarrage et initialisation de la base. Il exige une adresse e-mail valide, un mot de passe robuste et CUTLY_MFA_ENCRYPTION_KEY. Il affiche le secret TOTP une seule fois. Ne jamais utiliser les identifiants de démonstration en production.
+`npm run bootstrap:admin` initialise le premier compte après le démarrage et l’initialisation de la base. La procédure exige un e-mail valide, un mot de passe robuste et `CUTLY_MFA_ENCRYPTION_KEY`; le secret TOTP est affiché une seule fois. Ne pas utiliser les identifiants locaux en production.
 
-## Données et fonctionnalités
+## Réservations, paiements et fidélité
 
-Le site client applique la double vérification e-mail/téléphone avant la réservation. Les fournisseurs Resend et Twilio sont requis pour ces parcours; en leur absence, les envois ne sont pas simulés et la réservation reste bloquée. Le paiement est enregistré sur place. Les avis attendent l’approbation de Thomas avant publication. Les récompenses sont rendues disponibles si une réservation offerte se termine en NO_SHOW.
+La double vérification e-mail/téléphone est obligatoire avant réservation. Sans configuration réelle de Resend et Twilio, les envois ne sont pas simulés et la réservation reste bloquée. Les paiements sont enregistrés sur place. Les avis attendent l’approbation de Thomas. Une récompense réservée est restaurée après un `NO_SHOW` et consommée seulement quand la prestation est marquée `COMPLETED`.
 
-Le brouillon de confidentialité et les parcours d’export/demande ne constituent pas une validation juridique RGPD. Les durées de conservation et le processus d’anonymisation ou suppression doivent encore être validés.
+Le brouillon de confidentialité et les parcours d’export/demande ne valent pas validation juridique RGPD. Les durées de conservation, les sous-traitants et la politique de suppression/anonymisation restent à valider.
 
-## PostgreSQL et Render
+## Dépôt et déploiement
 
-Le dépôt GitHub public `noctivl9-rgb/cutly` est préparé pour recevoir le code. Le Blueprint Render prépare un service web et une base PostgreSQL, mais il n’a pas été synchronisé et crée des ressources payantes. Aucun domaine n’a été choisi.
+Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly). La branche `main` contient le code de préparation. Le Blueprint Render se trouve dans `render.yaml`; il prévoit un web service et une base PostgreSQL avec des plans payants. Ne pas synchroniser le Blueprint sans décision explicite sur le coût et le lancement.
 
-La migration contrôlée est documentée dans docs/POSTGRESQL_MIGRATION.md. Elle n’a pas été exécutée sur la base locale. Le schéma, l’adaptateur et les requêtes PostgreSQL doivent encore être vérifiés sur une instance PostgreSQL réelle avant le lancement.
-
-Resend et Twilio ne sont pas configurés. Aucun achat, abonnement, connexion de compte ou déploiement public n’a été effectué.
-
-Voir [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [déploiement Render](docs/DEPLOYMENT.md), [migration PostgreSQL](docs/POSTGRESQL_MIGRATION.md), [fournisseurs](docs/PROVIDERS.md) et [sauvegarde/restauration](docs/BACKUP_RESTORE.md).
+La migration contrôlée SQLite vers PostgreSQL est décrite dans [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md). Le plan et les prérequis de production sont dans [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md), [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/PROVIDERS.md](docs/PROVIDERS.md) et [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).

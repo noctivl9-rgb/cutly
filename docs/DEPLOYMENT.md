@@ -1,52 +1,48 @@
 # Préparation du déploiement Render
 
-## État
+## État au 13 octobre 2026
 
-Le fichier render.yaml décrit maintenant un service Node à Francfort et une base PostgreSQL managée distincte. La base utilise le plan 0.5 CPU / 1 GB, PostgreSQL 18 et refuse les connexions externes par défaut. Le service utilise le plan 0.5 CPU / 512 MB et récupère l’URL privée de la base avec fromDatabase. Le runtime Node est fixé par .node-version.
+`render.yaml` décrit un web service Node à Francfort et une base PostgreSQL managée distincte. Le service référence la connexion privée de la base et désactive le déploiement automatique. Le Blueprint n’a pas été synchronisé : aucun service Render, aucune base de production et aucun déploiement n’existent.
 
-Ces plans sont payants. Le Blueprint n’a pas été synchronisé : aucun compte Render n’a été connecté et aucune ressource n’a été créée. Vérifier le tarif courant et le budget dans Render avant toute synchronisation.
+Le dépôt GitHub public `noctivl9-rgb/cutly` contient le code sur `main`. Le domaine reste à choisir. Le code local utilise toujours SQLite; la réservation est bloquée tant que Resend, Twilio et l’URL HTTPS ne sont pas configurés.
 
-Estimation Render vérifiée le 13 octobre 2026 : environ 7 USD/mois pour le service web, 19 USD/mois pour le PostgreSQL 0.5 CPU / 1 GB et 1,20 USD/mois pour les 4 GB au-delà du premier GB inclus dans un disque de 5 GB. Total de base estimé : 27,20 USD/mois, hors taxes éventuelles, trafic excédentaire, Resend, Twilio et domaine. La tarification peut changer; confirmer dans la console avant création.
+## Coût et niveau gratuit
 
-Le site reste local. Aucun domaine n’est défini, aucun dépôt Git distant n’est connecté, aucune base de production n’existe et aucun déploiement n’a eu lieu.
+Les plans configurés sont payants. Au 13 octobre 2026, le tarif officiel listé est d’environ 7 USD/mois pour le web `0.5c-512mb`, 19 USD/mois pour PostgreSQL `0.5c-1g` et 0,30 USD/GB/mois de stockage au-delà du premier GB inclus. Le disque de 5 GB du Blueprint donne environ 1,20 USD/mois de stockage supplémentaire, soit **environ 27,20 USD/mois**, hors taxes, trafic et services externes. Vérifier le récapitulatif de facturation Render avant toute création; aucun frais n’a été engagé.
 
-## Préconditions
+Render propose un niveau gratuit, mais PostgreSQL gratuit expire au bout de 30 jours, puis est supprimé après une période de grâce de 14 jours et n’offre pas de sauvegardes. Un service web gratuit s’endort après 15 minutes d’inactivité; son système de fichiers est éphémère. Ce niveau convient au mieux à un aperçu temporaire sans données réelles, pas à une exploitation fiable de CUTLY.
 
-- Dépôt Git privé avec l’accès nécessaire pour le connecter à Render.
-- Compte Render et validation explicite des coûts des deux ressources payantes.
-- Décision sur le nom de domaine et accès DNS.
-- Compte Resend, domaine d’envoi vérifié et secrets à configurer séparément.
-- Compte Twilio, expéditeur autorisé et secrets à configurer séparément.
-- Adresse e-mail réelle de l’administrateur Thomas et mot de passe robuste.
-- Secret MFA de 32 octets stocké dans un gestionnaire de secrets.
-- Validation juridique de la politique de confidentialité et des durées de conservation.
+Références officielles : [tarifs Render](https://render.com/pricing), [plans compute](https://render.com/docs/compute-plans), [limitations gratuites](https://render.com/docs/free), [spécification Blueprint](https://render.com/docs/blueprint-spec).
 
-Ne jamais coller de secrets dans le chat, le dépôt, les journaux ou les captures.
+## Prérequis à réunir avant création
 
-## Ordre de mise en place
+- Autorisation explicite pour créer les ressources payantes ou choix d’un environnement gratuit temporaire sans données réelles.
+- Compte Render connecté au dépôt GitHub.
+- Décision sur le domaine et accès DNS si un domaine personnalisé est souhaité.
+- Comptes Resend/Twilio, expéditeur vérifié et secrets à configurer séparément.
+- Adresse e-mail de production de Thomas et secret MFA de 32 octets stocké dans le gestionnaire de secrets.
+- Validation juridique des textes, durées de conservation et sous-traitants.
+- Décision documentée sur le transfert de la base SQLite locale.
 
-1. Connecter le dépôt Git privé au compte Render et inspecter le plan avant de créer les ressources. Le Blueprint garde l’auto-déploiement désactivé.
-2. Créer la base PostgreSQL et vérifier la région, la version et l’option de récupération. La liste IP vide bloque les connexions externes; l’application dans la même région utilise l’URL privée.
-3. Avant le premier démarrage de l’application, décider si les données SQLite locales doivent être importées. Si oui, suivre docs/POSTGRESQL_MIGRATION.md avec une sauvegarde vérifiée et un accès externe temporaire limité à l’adresse IP du poste. Ne pas démarrer l’application avant la migration : son initialisation crée le schéma de la base cible et le script de migration exige une cible vide.
-4. Après validation de la migration et des comptes à conserver, connecter le service à la base, puis renseigner les secrets dans Render. Le domaine public doit être fixé avant de renseigner CUTLY_PUBLIC_BASE_URL en HTTPS.
-5. Lancer un déploiement de contrôle seulement après l’autorisation explicite de publication. Vérifier /healthz et /api/status; booking doit rester BLOCKED jusqu’à l’initialisation MFA et la configuration réelle des fournisseurs.
-6. Initialiser le compte administrateur final une seule fois avec npm run bootstrap:admin. Conserver le secret TOTP dans un gestionnaire sécurisé puis retirer immédiatement les variables temporaires de bootstrap.
-7. Tester les parcours de vérification réels Resend/Twilio, la réservation, l’administration, les rappels et les alertes avant d’ouvrir le site aux clients.
+Ne jamais envoyer de secret dans le chat, dans le dépôt, dans les logs ou dans une capture d’écran.
 
-## Configuration sensible
+## Ordre de déploiement à suivre après autorisation
 
-Le Blueprint crée CUTLY_DATABASE_URL via l’URL PostgreSQL privée de Render. Les valeurs sync:false doivent être configurées dans le gestionnaire de secrets de Render : CUTLY_PUBLIC_BASE_URL, CUTLY_MFA_ENCRYPTION_KEY, RESEND_API_KEY, CUTLY_EMAIL_FROM, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN et un expéditeur TWILIO_FROM ou TWILIO_MESSAGING_SERVICE_SID. Les SMS de rendez-vous restent désactivés par défaut.
+1. Dans Render, connecter le dépôt `noctivl9-rgb/cutly` et choisir le Blueprint `render.yaml`.
+2. Examiner les ressources, région, stockage et montant affiché avant de confirmer. Ne pas continuer si le prix ne correspond pas à l’autorisation accordée.
+3. Créer PostgreSQL sans démarrer l’application contre la base avant d’avoir décidé du transfert. Le Blueprint bloque les connexions externes; l’application de la même région utilise le réseau privé.
+4. Si les données locales doivent être migrées, arrêter les écritures, faire une sauvegarde SQLite distincte et vérifier son intégrité. Suivre `POSTGRESQL_MIGRATION.md`; utiliser l’URL externe uniquement avec TLS et accès temporaire restreint. Ne jamais exécuter une migration sur une base contenant déjà des données utiles.
+5. Après comparaison des données et de l’intégrité, configurer les secrets Render, l’URL HTTPS, Resend et Twilio.
+6. Déployer d’abord dans un environnement de contrôle, puis vérifier `/healthz`, `/api/status`, les flux d’authentification, de réservation, de notification et d’administration.
+7. Initialiser une seule fois l’administrateur final avec MFA. Ne pas recréer un compte si une migration a déjà transféré celui de Thomas.
+8. Valider restauration, surveillance, documents RGPD et checklist avant ouverture publique.
 
-Ne pas ajouter CUTLY_DB_PATH au service de production. SQLite reste le choix du développement local uniquement.
+## Variables de production
+
+Le Blueprint injecte `CUTLY_DATABASE_URL` via l’URL privée PostgreSQL Render. Les autres secrets et paramètres `sync: false` sont renseignés dans le gestionnaire Render : `CUTLY_PUBLIC_BASE_URL`, `CUTLY_MFA_ENCRYPTION_KEY`, `RESEND_API_KEY`, `CUTLY_EMAIL_FROM`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` et `TWILIO_FROM` ou `TWILIO_MESSAGING_SERVICE_SID`. Les SMS de rendez-vous restent désactivés par défaut.
+
+Ne pas définir `CUTLY_DB_PATH` en production. SQLite est réservé au développement local. Le démarrage en mode production refuse les paramètres essentiels absents; `/api/status` expose uniquement les états de configuration.
 
 ## Retour arrière
 
-Avant bascule, conserver la sauvegarde SQLite vérifiée et l’ancienne base intactes. Après l’import, ne pas redémarrer l’application avec SQLite si des écritures de production ont déjà été faites sur PostgreSQL : cela ferait perdre ces écritures du parcours actif. Un retour arrière après ouverture aux clients exige un plan de réconciliation des nouvelles réservations, paiements, audits et mouvements de fidélité.
-
-Pour un défaut de code sans dommage de données, restaurer la révision précédente du code tout en gardant PostgreSQL. Pour une corruption, effectuer une restauration PostgreSQL vers une nouvelle instance, la vérifier, puis basculer explicitement l’URL après validation.
-
-## Documentation Render
-
-- Blueprint et plans : https://render.com/docs/blueprint-spec
-- Connexion à PostgreSQL : https://render.com/docs/postgresql-creating-connecting
-- Sauvegardes et restauration PostgreSQL : https://render.com/docs/postgresql-backups
+Garder SQLite et sa sauvegarde vérifiée en lecture seule durant la période de contrôle définie. Après les premières écritures sur PostgreSQL, revenir à SQLite ferait perdre les réservations, paiements, audits et mouvements de fidélité créés depuis la bascule. Pour un problème de code, restaurer la version précédente du code en conservant PostgreSQL. Pour une corruption de base, restaurer vers une nouvelle instance, valider son intégrité, puis basculer explicitement la connexion.
