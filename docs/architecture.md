@@ -28,7 +28,7 @@ Ne pas placer ces valeurs dans le dépôt. L’absence de configuration n’est 
 
 ## Limites avant production
 
-- Serveur local lié à `127.0.0.1`; `CUTLY_HOST=0.0.0.0` peut le lier derrière l’hébergeur/proxy en production. Blueprint Render préparé avec `/healthz`, aucune instance, domaine, DNS ou HTTPS n’est activé.
+- Serveur local sur `127.0.0.1`. Netlify est la cible serverless préparée avec `netlify.toml` et `netlify/functions/api.js`; aucun site ni URL publique configuré.
 - SQLite mono-instance et limiteurs en mémoire ne conviennent pas à un déploiement horizontal. Choisir une base gérée, des limites distribuées, un gestionnaire de secrets et une stratégie de migration/rollback avant l’exploitation commerciale.
 - Script de sauvegarde testée localement ajouté; aucun job planifié, stockage hors site, surveillance ou système d’alerte de production n’est configuré.
 - La page de confidentialité est un brouillon. Les fondements, durées, identité du responsable, sous-traitants et politique d’effacement exigent validation juridique.

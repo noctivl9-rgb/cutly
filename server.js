@@ -20,15 +20,16 @@ function assertProductionConfiguration(){
  if(!emailConfigured())throw new Error('Production requires RESEND_API_KEY and CUTLY_EMAIL_FROM.');
  if(!smsConfigured())throw new Error('Production requires Twilio credentials and a sender or messaging service.');
  try{publicBaseUrl();}catch{throw new Error('Production requires a valid HTTPS CUTLY_PUBLIC_BASE_URL.');}
- if(!process.env.CUTLY_DATABASE_URL)throw new Error('Production requires CUTLY_DATABASE_URL for PostgreSQL.');
+ if(!(process.env.CUTLY_DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or NETLIFY_DB_URL for PostgreSQL.');
 }
 if(process.env.NODE_ENV==='production')assertProductionConfiguration();
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_PATH = process.env.CUTLY_DB_PATH || path.join(DATA_DIR, 'cutly.sqlite');
-if(!process.env.CUTLY_DATABASE_URL)fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-const db = createDatabase({url:process.env.CUTLY_DATABASE_URL,sqlitePath:DB_PATH});
+const DATABASE_URL=process.env.CUTLY_DATABASE_URL||process.env.NETLIFY_DB_URL;
+if(!DATABASE_URL)fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+const db = createDatabase({url:DATABASE_URL,sqlitePath:DB_PATH});
 const shop = {
  id: 'thomas-shop', name: 'Thomas Shop', professional: 'Thomas',
  address: '8 cours de l’Île Seguin, Boulogne-Billancourt, France', phone: '+33 7 78 54 68 92',
@@ -218,11 +219,15 @@ for (let day=0; day<7; day++) seedHours.run(shop.id,day,(day===0||day===6)?'09:0
 
 async function initializePostgres(){
  if(db.kind!=='POSTGRES')return;
- await db.exec(fs.readFileSync(path.join(ROOT,'db/postgres/schema.sql'),'utf8'));
- await db.prepare(`INSERT INTO establishments(id,name,address,phone,instagram,description,timezone) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).run(shop.id,shop.name,shop.address,shop.phone,shop.instagram,shop.description,'Europe/Paris');
- const services=[['degrade-classique','Dégradé classique',500,30,1],['burst-fade','Burst Fade',700,30,1],['taper','Taper',500,30,1],['coupe-classique','Coupe classique',500,30,1],['contours','Contours',500,15,0]];
- for(const [id,name,price,duration,eligible] of services)await db.prepare('INSERT INTO services(id,establishment_id,name,price_cents,duration_minutes,eligible) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,shop.id,name,price,duration,eligible);
- for(let day=0;day<7;day++)await db.prepare('INSERT INTO opening_hours(establishment_id,weekday,opens,closes) VALUES(?,?,?,?) ON CONFLICT(establishment_id,weekday) DO NOTHING').run(shop.id,day,(day===0||day===6)?'09:00':null,(day===0||day===6)?'19:00':null);
+ const schema=fs.readFileSync(path.join(ROOT,'db/postgres/schema.sql'),'utf8');
+ await db.transaction(async tx=>{
+  await tx.lock('cutly:initialize-postgres-schema');
+  await tx.exec(schema);
+  await tx.prepare(`INSERT INTO establishments(id,name,address,phone,instagram,description,timezone) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).run(shop.id,shop.name,shop.address,shop.phone,shop.instagram,shop.description,'Europe/Paris');
+  const services=[['degrade-classique','Dégradé classique',500,30,1],['burst-fade','Burst Fade',700,30,1],['taper','Taper',500,30,1],['coupe-classique','Coupe classique',500,30,1],['contours','Contours',500,15,0]];
+  for(const [id,name,price,duration,eligible] of services)await tx.prepare('INSERT INTO services(id,establishment_id,name,price_cents,duration_minutes,eligible) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,shop.id,name,price,duration,eligible);
+  for(let day=0;day<7;day++)await tx.prepare('INSERT INTO opening_hours(establishment_id,weekday,opens,closes) VALUES(?,?,?,?) ON CONFLICT(establishment_id,weekday) DO NOTHING').run(shop.id,day,(day===0||day===6)?'09:00':null,(day===0||day===6)?'19:00':null);
+ });
 }
 
 async function publicServices(){return (await db.prepare("SELECT id,name,price_cents AS priceCents,duration_minutes AS durationMinutes FROM services WHERE establishment_id=? AND active=1 ORDER BY CASE id WHEN 'degrade-classique' THEN 1 WHEN 'burst-fade' THEN 2 WHEN 'taper' THEN 3 WHEN 'coupe-classique' THEN 4 WHEN 'contours' THEN 5 ELSE 99 END,lower(name)").all(shop.id));}
@@ -487,9 +492,14 @@ const server=http.createServer(async(req,res)=>{
 });
 const port=Number(process.env.PORT||3000);
 const host=process.env.CUTLY_HOST||(process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1');
-initializePostgres().then(()=>{
- server.listen(port,host,()=>console.log(`CUTLY listening on ${host}:${server.address().port}`));
- if(emailConfigured()||smsConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),15_000);worker.unref();}
-}).catch(async error=>{console.error('CUTLY database initialization failed',error.code||'database_error');await db.close().catch(()=>{});process.exitCode=1;});
-let shuttingDown=false;function shutdown(){if(shuttingDown)return;shuttingDown=true;const timeout=setTimeout(()=>process.exit(1),10_000);timeout.unref();server.close(async()=>{await db.close();clearTimeout(timeout);process.exit(0);});}
-process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
+const databaseReady=initializePostgres();
+if(require.main===module){
+ databaseReady.then(()=>{
+  server.listen(port,host,()=>console.log(`CUTLY listening on ${host}:${server.address().port}`));
+  if(emailConfigured()||smsConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),15_000);worker.unref();}
+ }).catch(async error=>{console.error('CUTLY database initialization failed',error.code||'database_error');await db.close().catch(()=>{});process.exitCode=1;});
+ let shuttingDown=false;function shutdown(){if(shuttingDown)return;shuttingDown=true;const timeout=setTimeout(()=>process.exit(1),10_000);timeout.unref();server.close(async()=>{await db.close();clearTimeout(timeout);process.exit(0);});}
+ process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
+}
+
+module.exports={server,databaseReady,db};
