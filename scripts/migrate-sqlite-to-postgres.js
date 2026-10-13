@@ -7,7 +7,7 @@ const TABLES = [
  'establishments', 'users', 'services', 'opening_hours', 'appointments', 'sessions', 'admin_mfa',
  'verification_challenges', 'establishment_members', 'unavailability', 'cancellation_requests',
  'payment_events', 'rewards', 'loyalty_ledger', 'reviews', 'audit_events', 'notification_outbox',
- 'idempotency_keys', 'schema_migrations'
+ 'idempotency_keys', 'schema_migrations', 'rate_limits'
 ];
 
 function getArg(name) {
@@ -50,7 +50,7 @@ function inspectSource(sourcePath) {
    AND a.starts_at<u.ends_at AND a.ends_at>u.starts_at LIMIT 1`).get();
   if (blockedAppointment) throw new Error('source_has_appointments_in_unavailability');
   const counts = new Map();
-  for (const table of TABLES) counts.set(table, source.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get().count);
+  for (const table of TABLES) counts.set(table, table==='rate_limits'&&!source.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='rate_limits'").get()?0:source.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get().count);
   return { counts };
  } finally { source.close(); }
 }
@@ -77,10 +77,11 @@ async function migrate({ sqlitePath, backupPath, databaseUrl }) {
     await tx.prepare('DELETE FROM schema_migrations').run();
     for (const table of TABLES) {
      const columns = source.prepare(`PRAGMA table_info("${table}")`).all().map(column => column.name);
+     if(table==='rate_limits'&&!columns.length)continue;
      if (!columns.length || columns.some(column => !/^[a-z][a-z0-9_]*$/i.test(column))) throw new Error(`invalid_source_table:${table}`);
      const rows = source.prepare(`SELECT * FROM "${table}"`).all();
      const placeholders = columns.map((_, index) => `$${index + 1}`).join(',');
-     const insert = tx.prepare(`INSERT INTO "${table}" (${columns.map(column => `"${column}"`).join(',')}) VALUES(${placeholders}) ON CONFLICT DO NOTHING`);
+     const insert = tx.prepare(`INSERT INTO "${table}" (${columns.map(column => `"${column}"`).join(',')}) VALUES(${placeholders})`);
      for (const row of rows) {
       const values = columns.map(column => table === 'appointments' && column === 'reward_id' ? null : row[column]);
       await insert.run(...values);
@@ -91,6 +92,10 @@ async function migrate({ sqlitePath, backupPath, databaseUrl }) {
     for (const table of TABLES) {
      const actual = await tx.prepare(`SELECT COUNT(*) AS count FROM "${table}"`).get();
      if (Number(actual.count) !== Number(sourceDetails.counts.get(table))) throw new Error(`row_count_mismatch:${table}`);
+     const canonical = rows => rows.map(row => JSON.stringify(Object.keys(row).sort().map(key => [key,row[key]]))).sort();
+     const originalRows = canonical(table==='rate_limits'&&!source.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='rate_limits'").get()?[]:source.prepare(`SELECT * FROM "${table}"`).all());
+     const copiedRows = canonical(await tx.prepare(`SELECT * FROM "${table}"`).all());
+     if (JSON.stringify(originalRows) !== JSON.stringify(copiedRows)) throw new Error(`row_content_mismatch:${table}`);
     }
    });
   } finally { source.close(); }

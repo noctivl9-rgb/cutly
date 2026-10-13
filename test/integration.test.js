@@ -57,6 +57,19 @@ test('public shop exposes the official catalogue and opening hours',async()=>{
  assert.equal(shop.hours.length,7);assert.deepEqual(shop.hours.filter(h=>h.open).map(h=>[h.weekday,h.open,h.close]),[[0,'09:00','19:00'],[6,'09:00','19:00']]);
 });
 
+test('PWA resources are served with installable manifest and an explicit offline page',async()=>{
+ const [manifestResponse,workerResponse,installResponse,offlineResponse,iconResponse]=await Promise.all([
+  fetch(`${baseUrl}/manifest.webmanifest`),fetch(`${baseUrl}/service-worker.js`),fetch(`${baseUrl}/install.html`),fetch(`${baseUrl}/offline.html`),fetch(`${baseUrl}/icons/cutly-192.png`)
+ ]);
+ const manifest=await manifestResponse.json(),worker=await workerResponse.text(),install=await installResponse.text(),offline=await offlineResponse.text();
+ assert.equal(manifestResponse.headers.get('content-type'),'application/manifest+json; charset=utf-8');
+ assert.deepEqual(manifest.icons.map(icon=>icon.sizes),['192x192','512x512']);
+ assert.equal(workerResponse.status,200);assert.match(worker,/url\.pathname\.startsWith\('\/api\/'\)/);
+ assert.equal(installResponse.status,200);assert.match(install,/Safari/);assert.match(install,/Chrome/);
+ assert.equal(offlineResponse.status,200);assert.match(offline,/Cette page ne permet pas d’envoyer de réservation hors ligne/);
+ assert.equal(iconResponse.headers.get('content-type'),'image/png');assert.equal(iconResponse.status,200);
+});
+
 test('availability follows duration, weekend and past-time rules',async()=>{
  const [saturday,sunday]=upcomingWeekend();const monday=new Date(`${sunday}T12:00:00Z`);monday.setUTCDate(monday.getUTCDate()+1);
  const thirty=await (await fetch(`${baseUrl}/api/availability?service=coupe-classique&date=${saturday}`)).json();

@@ -13,6 +13,8 @@ const { submitReview, decideReview } = require('./lib/reviews');
 const { getDashboardSummary } = require('./lib/dashboard');
 const { requestCancellation, resolveCancellationRequest } = require('./lib/cancellations');
 const { processOutbox } = require('./lib/notifications');
+const { dispatchScheduledNotifications } = require('./lib/scheduled-jobs');
+const { consumeAttempt } = require('./lib/rate-limit');
 const { withTransaction } = require('./lib/database');
 
 function assertProductionConfiguration(){
@@ -193,7 +195,8 @@ const migrations=[
   if(!hasColumn('notification_outbox','provider_name'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN provider_name TEXT');
   if(!hasColumn('notification_outbox','provider_message_id'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN provider_message_id TEXT');
   if(!hasColumn('notification_outbox','provider_status'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN provider_status TEXT');
- }}
+ }},
+ {version:7,name:'shared-rate-limits',up:()=>bootstrapDb.exec('CREATE TABLE IF NOT EXISTS rate_limits(key_hash TEXT PRIMARY KEY,attempts INTEGER NOT NULL,expires_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS rate_limits_expiry_idx ON rate_limits(expires_at);')}
 ];
 for(const migration of migrations){
  if(bootstrapDb.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get(migration.version))continue;
@@ -233,7 +236,7 @@ async function initializePostgres(){
 async function publicServices(){return (await db.prepare("SELECT id,name,price_cents AS priceCents,duration_minutes AS durationMinutes FROM services WHERE establishment_id=? AND active=1 ORDER BY CASE id WHEN 'degrade-classique' THEN 1 WHEN 'burst-fade' THEN 2 WHEN 'taper' THEN 3 WHEN 'coupe-classique' THEN 4 WHEN 'contours' THEN 5 ELSE 99 END,lower(name)").all(shop.id));}
 async function busySlots(...values){return (await db.prepare("SELECT starts_at AS startsAt, ends_at AS endsAt FROM appointments WHERE establishment_id=? AND status IN ('PENDING','CONFIRMED') AND starts_at < ? AND ends_at > ? UNION ALL SELECT starts_at AS startsAt, ends_at AS endsAt FROM unavailability WHERE establishment_id=? AND starts_at < ? AND ends_at > ?").all(...values));}
 async function findService(id,establishmentId){return (await db.prepare('SELECT * FROM services WHERE id=? AND establishment_id=? AND active=1').get(id,establishmentId));}
-const MIME = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml' };
+const MIME = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml' };
 const parisParts = (date) => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).reduce((o,p)=>(o[p.type]=p.value,o),{});
 function parisToUTC(date, time) {
  const [year,month,day]=date.split('-').map(Number), [hour,minute]=time.split(':').map(Number);
@@ -267,51 +270,54 @@ const SECURITY_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'st
 function json(res,status,payload,extra={}) { res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...SECURITY_HEADERS,...extra});res.end(JSON.stringify(payload)); }
 function readBody(req){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>16_384){reject(new Error('body_too_large'));req.destroy();}});req.on('end',()=>{try{resolve(JSON.parse(raw||'{}'));}catch{reject(new Error('invalid_json'));}});req.on('error',reject);});}
 const loginAttempts=new Map();
-const publicAttempts=new Map();
 const dummyPasswordHash=hashPassword('CUTLY-unknown-account-password');
 function rateLimitKey(req,email){return `${req.socket.remoteAddress||'unknown'}:${String(email||'').trim().toLowerCase().slice(0,254)}`;}
-function allowPublicAttempt(key,limit=5,windowMs=15*60*1000){const now=Date.now(),bucket=publicAttempts.get(key);if(bucket&&bucket.until>now&&bucket.count>=limit)return false;publicAttempts.set(key,{count:bucket&&bucket.until>now?bucket.count+1:1,until:bucket&&bucket.until>now?bucket.until:now+windowMs});if(publicAttempts.size>5000)for(const [candidate,entry] of publicAttempts)if(entry.until<=now)publicAttempts.delete(candidate);return true;}
+function allowPublicAttempt(key,limit=5,windowMs=15*60*1000){return consumeAttempt(db,key,limit,windowMs);}
 function checkSameOrigin(req){const origin=req.headers.origin;if(!origin)return process.env.NODE_ENV!=='production';try{return new URL(origin).host===req.headers.host;}catch{return false;}}
 function sessionFor(req){return sessionFromRequest(db,req);}
 function adminFailure(res,error){return json(res,error.status||500,{error:error.code||'request_failed'});}
 const server=http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,'http://localhost');
+  if(url.pathname==='/api/internal/notifications'){
+   if(req.method!=='POST')return json(res,405,{error:'method_not_allowed'},{allow:'POST'});
+   const result=await dispatchScheduledNotifications(db,req.headers.authorization);return json(res,result.status,result.body);
+  }
   if(req.method==='GET'&&url.pathname==='/healthz'){
     try{await db.prepare('SELECT 1 AS ok').get();return json(res,200,{status:'ok'});}catch{return json(res,503,{status:'unavailable'});}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/register'){
-   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
     if(!await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get())return json(res,503,{error:'administrator_not_initialized'});
    if(!emailConfigured()||!smsConfigured())return json(res,503,{error:'verification_providers_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
     try{const account=await registerClient(db,body,{sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)});const session=await createSession(db,account.userId,req.headers['user-agent']);return json(res,201,{email:account.email,verificationRequired:account.verificationRequired},{'set-cookie':cookieHeader(session.token)});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/resend-verification'){
-   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured()||!smsConfigured())return json(res,503,{error:'verification_providers_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured()||!smsConfigured())return json(res,503,{error:'verification_providers_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
    try{return json(res,202,await resendClientVerification(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-email'){
     if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await verifyEmail(db,{token:body.token}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-phone'){
-    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!allowPublicAttempt(key,8,15*60*1000))return json(res,429,{error:'too_many_attempts'});try{return json(res,200,await verifyPhone(db,{email:body.email,code:body.code}));}catch(error){return adminFailure(res,error);}
+    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,8,15*60*1000))return json(res,429,{error:'too_many_attempts'});try{return json(res,200,await verifyPhone(db,{email:body.email,code:body.code}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset'){
-   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
    try{await requestPasswordReset(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message)});return json(res,202,{accepted:true});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset/confirm'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await resetClientPassword(db,{token:body.token,newPassword:body.newPassword}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/login'){
-   const body=await readBody(req),key=`client:${rateLimitKey(req,body.email)}`,windowMs=15*60*1000,now=Date.now(),bucket=loginAttempts.get(key);
+   const body=await readBody(req);if(!await consumeAttempt(db,`client-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=`client:${rateLimitKey(req,body.email)}`,windowMs=15*60*1000,now=Date.now(),bucket=loginAttempts.get(key);
    if(bucket&&bucket.until>now&&bucket.count>=5)return json(res,429,{error:'too_many_attempts'},{'retry-after':String(Math.ceil((bucket.until-now)/1000))});
     const email=typeof body.email==='string'?body.email.trim().toLowerCase():'';const user=await db.prepare("SELECT id,email,password_hash,role,disabled_at FROM users WHERE lower(email)=lower(?) AND role='CLIENT'").get(email);
    const passwordOk=await verifyPassword(String(body.password||''),user?.password_hash||await dummyPasswordHash);if(!user||user.disabled_at||!passwordOk){const current=loginAttempts.get(key);loginAttempts.set(key,{count:(current&&current.until>now?current.count:0)+1,until:current&&current.until>now?current.until:now+windowMs});return json(res,401,{error:'invalid_credentials'});}
     loginAttempts.delete(key);const session=await createSession(db,user.id,req.headers['user-agent']);return json(res,200,{user:{email:user.email,role:user.role},expiresAt:session.expiresAt},{'set-cookie':cookieHeader(session.token)});
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/admin/login'){
-   const body=await readBody(req),key=rateLimitKey(req,body.email),windowMs=15*60*1000,now=Date.now();
+   const body=await readBody(req);if(!await consumeAttempt(db,`admin-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=rateLimitKey(req,body.email),windowMs=15*60*1000,now=Date.now();
    const bucket=loginAttempts.get(key);if(bucket&&bucket.until>now&&bucket.count>=5)return json(res,429,{error:'too_many_attempts'},{'retry-after':String(Math.ceil((bucket.until-now)/1000))});
    const normalized=typeof body.email==='string'?body.email.trim().toLowerCase():'';
     const user=await db.prepare("SELECT id,email,password_hash,role,disabled_at FROM users WHERE lower(email)=lower(?)").get(normalized);

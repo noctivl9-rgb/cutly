@@ -4,3 +4,8 @@ data/
 !.env.example
 node_modules/
 npm-debug.log*
+backups/
+*.dump
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

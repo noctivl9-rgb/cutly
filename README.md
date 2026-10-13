@@ -30,6 +30,14 @@ La double vérification e-mail/téléphone est obligatoire avant toute réservat
 
 Le brouillon de confidentialité et les parcours d’export/demande ne constituent pas une validation juridique RGPD. Les durées de conservation, les sous-traitants et les règles de suppression/anonymisation restent à valider.
 
+## Installation mobile
+
+La PWA utilise un cache limité à la page hors connexion, à la page d’installation et aux icônes. Les routes API, les données privées et les réservations ne sont jamais mises en cache. En production HTTPS, consulter `/install.html` pour les instructions iPhone et Android. Les navigateurs et appareils physiques doivent encore être testés avant de déclarer l’installation vérifiée.
+
+## Installation mobile
+
+La PWA utilise un cache limité à la page hors connexion, à la page d’installation et aux icônes. Les routes API, les données privées et les réservations ne sont jamais mises en cache. En production HTTPS, consulter `/install.html` pour les instructions iPhone et Android. Les navigateurs et appareils physiques doivent encore être testés avant de déclarer l’installation vérifiée.
+
 ## Dépôt et hébergement
 
 Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly), branche `main`. Netlify est l’hébergeur demandé. La configuration du site et de la fonction se trouve dans `netlify.toml` et `netlify/functions/api.js`. Le guide est dans [docs/NETLIFY_DEPLOYMENT.md](docs/NETLIFY_DEPLOYMENT.md).

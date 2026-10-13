@@ -1,6 +1,6 @@
 # Préparation de l’hébergement Netlify
 
-État vérifié le 13 octobre 2026. Netlify est la cible choisie, mais aucun compte, site, base PostgreSQL, URL publique ni fournisseur de notifications n’a été connecté ou configuré dans ce dépôt.
+État vérifié le 13 octobre 2026. Le compte Netlify a été ouvert, mais aucun site CUTLY, base PostgreSQL, URL publique ni fournisseur de notifications n’a été connecté. Le site RIHLA existant dans le compte n’est pas CUTLY et ne doit pas être modifié.
 
 ## Configuration du dépôt
 
@@ -13,11 +13,13 @@ La fonction Netlify et les routes de santé ont été testées localement. Aucun
 
 ## Limites importantes du plan gratuit
 
-Le plan Netlify Free est affiché à 0 USD/mois et inclut 300 crédits par mois avec une limite stricte : aucun rechargement automatique. Chaque déploiement de production consomme 15 crédits. Si les crédits sont épuisés, les fonctionnalités peuvent s’arrêter jusqu’au prochain cycle. Le guide officiel indique également que la base Netlify consomme des crédits de calcul et de bande passante ; le niveau Free plafonne chaque base à 48 unités de calcul par période, 5 Go sortants, 5 Go écrits et 5 Go stockés, avec mise en veille après 5 minutes d’inactivité et une rétention de sauvegarde planifiée de 3 jours. Le tarif du stockage après le 1er juillet 2026 doit être vérifié dans la console et la documentation de facturation avant de créer la base.
+Le plan Netlify Free est affiché à 0 USD/mois avec 300 crédits mensuels et un plafond strict. Un déploiement de production consomme 15 crédits. La base consomme des crédits de calcul et de bande passante ; elle est plafonnée à 48 unités de calcul, 5 Go de données écrites, 5 Go de bande passante et 5 Go de stockage par période. Elle s’endort après 5 minutes d’inactivité, avec 3 jours de rétention des sauvegardes planifiées. La documentation consultée ne donne pas le tarif du stockage après le 1er juillet 2026 : vérifier les conditions affichées dans le compte avant de créer la base. Aucun rechargement n’est possible sur le plan Free ; atteindre une limite peut interrompre les ressources.
 
 Les fonctions planifiées existent sur tous les plans, mais un réveil fréquent de PostgreSQL pour livrer les rappels de 24 h et 2 h consomme du calcul. Un rythme suffisamment fréquent peut dépasser le budget gratuit de la base, et un rythme espacé ferait arriver les rappels en retard. Le plan Free n’est donc pas validé comme exploitation fiable de CUTLY sans mesure d’usage et stratégie de tâches adaptée. Les rappels ne sont pas déclarés opérationnels.
 
 Sources officielles : [plans et crédits](https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/credit-based-pricing-plans/), [consommation et limites PostgreSQL](https://docs.netlify.com/build/data-and-storage/netlify-database/billing-and-usage/), [fonctions planifiées](https://docs.netlify.com/build/functions/scheduled-functions/), [Express sur Netlify](https://docs.netlify.com/build/frameworks/framework-setup-guides/express/).
+
+Pour la comparaison avec Neon Free et Supabase Free, les plafonds de calcul, stockage, suspension et sauvegardes sont consignés dans [PRODUCTION_READINESS.md](../PRODUCTION_READINESS.md). Aucune offre gratuite n’est considérée comme validée pour la production commerciale.
 
 ## Éléments à préparer dans Netlify
 
@@ -31,7 +33,7 @@ Sources officielles : [plans et crédits](https://docs.netlify.com/manage/accoun
 
 ## Variables et migrations
 
-La commande `npm run migrate:sqlite-to-postgres` utilise `CUTLY_DATABASE_URL`; pour exporter une base Netlify depuis un environnement de confiance, copier temporairement `NETLIFY_DB_URL` dans cette variable sans l’afficher, puis lancer la procédure décrite dans `docs/POSTGRESQL_MIGRATION.md`. Une cible contenant déjà des tables est refusée. La migration crée et vérifie une nouvelle sauvegarde avant d’écrire la base cible.
+La commande `npm run migrate:sqlite-to-postgres` accepte `CUTLY_DATABASE_URL` ou `NETLIFY_DB_URL`. Le bootstrap du premier administrateur accepte ces mêmes variables. Ne jamais afficher la chaîne de connexion. Une cible contenant déjà des tables est refusée. La migration crée et vérifie une nouvelle sauvegarde avant d’écrire la base cible.
 
 Ne jamais importer des données réelles dans un environnement de test partagé. Ne pas revenir à SQLite après avoir commencé à écrire de nouvelles réservations, paiements ou mouvements de fidélité dans PostgreSQL.
 

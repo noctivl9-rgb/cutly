@@ -11,7 +11,7 @@ async function main() {
  if (process.env.NODE_ENV === 'production' && /(?:@(?:localhost|cutly\.local|example\.(?:com|net|org))$|\.(?:local|test|invalid)$)/i.test(email)) throw new Error('Production bootstrap refuses a local or reserved demo email address.');
  if (!password || password.length < 12) throw new Error('Set CUTLY_BOOTSTRAP_ADMIN_PASSWORD to at least 12 characters.');
  if (!key) throw new Error('Set CUTLY_MFA_ENCRYPTION_KEY to a base64-encoded 32-byte key.');
- const db = createDatabase({ url: process.env.CUTLY_DATABASE_URL, sqlitePath: process.env.CUTLY_DB_PATH || path.join(__dirname, '..', 'data', 'cutly.sqlite') });
+ const db = createDatabase({ url: process.env.CUTLY_DATABASE_URL || process.env.NETLIFY_DB_URL, sqlitePath: process.env.CUTLY_DB_PATH || path.join(__dirname, '..', 'data', 'cutly.sqlite') });
  try {
   const tables = db.kind === 'POSTGRES'
    ? await db.prepare("SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'").all()

@@ -1,6 +1,6 @@
 # Déploiement
 
-La cible choisie est Netlify. Suivre [NETLIFY_DEPLOYMENT.md](NETLIFY_DEPLOYMENT.md) pour le statut actuel, les variables et les limites du plan gratuit. `netlify.toml` décrit le build et les redirections vers la fonction serverless. Aucun site Netlify ni déploiement n’a été créé.
+La cible choisie est Netlify. Suivre [NETLIFY_DEPLOYMENT.md](NETLIFY_DEPLOYMENT.md) pour le statut actuel, les variables et les limites du plan gratuit. `netlify.toml` décrit le build et les redirections vers la fonction serverless. Aucun site Netlify ni déploiement n’a été créé. Le code adapté à Netlify reste local tant qu’il n’a pas été poussé sur GitHub.
 
 Le fichier `render.yaml` et les mentions Render dans des documents d’architecture/migration sont des restes de la préparation précédente ; ils ne sont pas la configuration active choisie. Ne pas synchroniser ce Blueprint.
 

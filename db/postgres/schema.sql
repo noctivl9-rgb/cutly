@@ -230,6 +230,13 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 );
 CREATE INDEX IF NOT EXISTS outbox_delivery_idx ON notification_outbox(status,next_attempt_at);
 
+CREATE TABLE IF NOT EXISTS rate_limits (
+ key_hash TEXT PRIMARY KEY,
+ attempts INTEGER NOT NULL,
+ expires_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS rate_limits_expiry_idx ON rate_limits(expires_at);
+
 CREATE TABLE IF NOT EXISTS idempotency_keys (
  key TEXT PRIMARY KEY,
  scope TEXT NOT NULL,
@@ -273,6 +280,7 @@ FROM (VALUES
  (3,'appointment-reward-link'),
  (4,'version-opening-hours'),
  (5,'version-users'),
- (6,'notification-provider-receipts')
+ (6,'notification-provider-receipts'),
+ (7,'shared-rate-limits')
 ) AS migrations(version,name)
 ON CONFLICT(version) DO NOTHING;
