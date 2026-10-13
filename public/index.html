@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10100f">
+  <meta name="description" content="Réservez votre rendez-vous chez Thomas Shop avec CUTLY.">
+  <title>Thomas Shop — CUTLY</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/responsive-polish.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#accueil" aria-label="CUTLY, accueil"><span class="brand-mark">C</span><span>CUTLY</span></a>
+    <nav aria-label="Navigation principale"><a href="#salon">Le salon</a><a href="#prestations">Prestations</a><a href="/account.html">Mon espace</a></nav>
+    <a class="top-cta" href="#reserver">Réserver <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main id="accueil">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span> BOULOGNE-BILLANCOURT <span class="eyebrow-divider">/</span> PARIS</p>
+        <h1>Le style<br>dans le <em>détail.</em></h1>
+        <p class="hero-lede">Un rendez-vous, une vraie attention.<br>La coupe qui vous ressemble, signée Thomas.</p>
+        <a class="button button-dark" href="#reserver">Choisir mon créneau <span aria-hidden="true">↗</span></a>
+        <div class="hero-note"><span class="note-line"></span><span>Sur rendez-vous, simplement.</span></div>
+      </div>
+      <div class="hero-art" aria-label="Illustration abstraite noire et champagne évoquant une coupe précise">
+        <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
+        <div class="art-disc"><span class="disc-cut"></span><span class="disc-caption">THOMAS<br>SHOP</span></div>
+        <span class="art-index">TS—01</span><span class="art-caption">PRÉCISION · STYLE · VOUS</span>
+      </div>
+      <div class="hero-bottom"><span>01 — THOMAS SHOP</span><span>FAITES DÉFILER <span aria-hidden="true">↓</span></span></div>
+    </section>
+
+    <section class="intro section-wrap" id="salon">
+      <div class="section-label"><span>01</span><span>LE SALON</span></div>
+      <div class="intro-content"><p class="eyebrow">UN MOMENT POUR VOUS</p><h2>Le savoir-faire,<br><span>sans détour.</span></h2><p class="body-copy" id="description">Depuis plusieurs années, Thomas exerce dans le domaine de la coiffure professionnelle. Il propose des prestations de coiffure adaptées aux envies de chacun, avec une attention particulière portée aux finitions et à la qualité du résultat.</p><a class="text-link" href="https://www.instagram.com/thomas.921g?srtk=MWpqZmprbnBnbzhzNQ==" target="_blank" rel="noreferrer">Suivre Thomas sur Instagram <span>↗</span></a></div>
+      <div class="intro-meta"><div><span class="meta-label">ADRESSE</span><p id="address">8 cours de l’Île Seguin<br>Boulogne-Billancourt</p></div><div><span class="meta-label">HORAIRES</span><p id="opening-hours">Samedi & dimanche<br>09:00 — 19:00</p></div><div><span class="meta-label">CONTACT</span><p><a id="phone" href="tel:+33778546892">+33 7 78 54 68 92</a></p></div></div>
+    </section>
+
+    <section class="services section-wrap" id="prestations">
+      <div class="services-head"><div><p class="eyebrow">L’ESSENTIEL, BIEN FAIT</p><h2>Choisissez<br><span>votre coupe.</span></h2></div><div class="service-aside">Des prestations pensées pour<br>aller à l’essentiel.</div></div>
+      <div class="service-list" id="service-list" aria-live="polite"><div class="service-loading">Chargement des prestations…</div></div>
+    </section>
+
+    <section class="intro section-wrap" id="avis">
+      <div class="section-label"><span>03</span><span>AVIS VALIDÉS</span></div>
+      <div class="intro-content"><p class="eyebrow">RETOURS CLIENTS</p><h2>Leur expérience,<br><span>en toute transparence.</span></h2><div id="published-reviews" class="service-list" aria-live="polite"><p class="muted">Aucun avis publié pour le moment.</p></div></div>
+    </section>
+
+    <section class="booking" id="reserver">
+      <div class="booking-aside"><p class="eyebrow">VOTRE PROCHAIN RENDEZ-VOUS</p><h2>À vous<br>de <em>jouer.</em></h2><p>Choisissez une prestation, une date, puis un horaire qui vous convient.</p><div class="booking-aside-rule"></div><span>THOMAS SHOP <span class="gold-dot"></span> BOULOGNE</span></div>
+      <div class="booking-card">
+        <div class="booking-progress" aria-label="Étape 1 sur 3"><span class="progress-active">01</span><i></i><span>02</span><i></i><span>03</span></div>
+        <form id="booking-form" novalidate>
+          <fieldset class="booking-step" id="step-service"><legend>Quelle prestation ?</legend><p class="step-hint">Sélectionnez le service qui vous convient.</p><div id="service-options" class="service-options"></div><label class="field-label" for="booking-date">Choisissez une date</label><input id="booking-date" name="date" type="date" required><div id="slot-area" class="slot-area" aria-live="polite"><p class="slot-hint">Sélectionnez une prestation et une date pour voir les créneaux.</p></div></fieldset>
+          <fieldset class="booking-step booking-contact" id="step-contact" hidden><legend>Votre compte</legend><p class="step-hint">La réservation nécessite un compte avec e-mail et téléphone vérifiés.</p><div id="booking-account-state" class="verification-note">Connectez-vous pour vérifier votre compte.</div><div id="booking-login-form" class="booking-auth-form"><label class="field-label" for="booking-email">E-mail</label><input id="booking-email" name="email" type="email" autocomplete="email" required><label class="field-label" for="booking-password">Mot de passe</label><input id="booking-password" name="password" type="password" autocomplete="current-password" required><button class="button button-outline" id="booking-login-submit" type="button">Se connecter</button><p id="booking-login-message" class="form-message" role="status" aria-live="polite"></p></div><p class="step-hint">Pas encore de compte ? <a href="/account.html">Créer un compte et vérifier vos coordonnées</a>.</p></fieldset>
+          <div class="booking-summary" id="booking-summary" hidden></div><p class="form-message" id="form-message" role="status"></p><button class="button button-dark booking-submit" type="submit" id="booking-submit" disabled>Continuer <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="booking-legal">En poursuivant, vous acceptez nos <a href="#mentions">conditions de réservation</a>.</p>
+      </div>
+    </section>
+
+    <section class="closing section-wrap"><p class="eyebrow">THOMAS SHOP · BOULOGNE-BILLANCOURT</p><h2>À bientôt<br><em>chez Thomas.</em></h2><a class="button button-outline" href="#reserver">Réserver un créneau <span>↗</span></a></section>
+  </main>
+  <footer id="mentions"><a class="brand footer-brand" href="#accueil"><span class="brand-mark">C</span><span>CUTLY</span></a><span>© 2026 CUTLY — La réservation, bien pensée.</span><a href="tel:+33778546892">Nous contacter <span>↗</span></a></footer>
+</body>
+</html>

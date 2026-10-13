@@ -1,0 +1,14 @@
+/* Small-screen adjustments to keep the reference hero legible without changing its identity. */
+@media (max-width: 420px) {
+  .hero {
+    padding-top: 46px;
+  }
+
+  .hero-copy {
+    min-width: 0;
+  }
+
+  .hero-lede {
+    width: min(100%, 260px);
+  }
+}

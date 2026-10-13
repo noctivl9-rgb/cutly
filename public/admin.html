@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111111"><title>Administration — CUTLY</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+ <main class="admin-shell">
+  <header class="admin-top"><a href="/" aria-label="CUTLY accueil"><strong>CUTLY</strong> <span class="muted">/ Thomas Shop</span></a><button id="logout" class="secondary" hidden>Déconnexion</button></header>
+  <section id="login-panel"><h1>Administration</h1><p class="muted">Connectez-vous avec votre mot de passe et votre code d’authentification.</p>
+   <form id="login-form" class="admin-form">
+    <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
+    <label>Mot de passe<input name="password" type="password" autocomplete="current-password" required></label>
+    <label>Code d’authentification<input name="otp" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" maxlength="6" required></label>
+    <button type="submit">Se connecter</button><p class="admin-message" role="status" aria-live="polite"></p>
+   </form>
+  </section>
+  <section id="dashboard-panel" hidden><h1>Tableau de bord</h1><p id="admin-date" class="muted"></p><div id="metrics" class="admin-grid"></div>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Demandes d’annulation</h2></div><div id="cancellation-requests" class="admin-list"></div></section>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Horaires hebdomadaires</h2><span class="muted">Fuseau Europe/Paris</span></div><form id="hours-form" class="admin-form admin-hours-form"><label>Jour<select id="hours-day"><option value="1">Lundi</option><option value="2">Mardi</option><option value="3">Mercredi</option><option value="4">Jeudi</option><option value="5">Vendredi</option><option value="6">Samedi</option><option value="0">Dimanche</option></select></label><label>Ouverture<input id="hours-opens" type="time" step="900"></label><label>Fermeture<input id="hours-closes" type="time" step="900"></label><label class="admin-check"><input id="hours-closed" type="checkbox"> Fermé ce jour</label><button type="submit">Enregistrer les horaires</button></form><p id="hours-message" class="admin-message" role="status" aria-live="polite"></p></section>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Prestations</h2></div><div id="service-management" class="admin-service-list"></div><form id="new-service-form" class="admin-form admin-new-service"><h3>Ajouter une prestation</h3><label>Nom<input name="name" maxlength="100" required></label><label>Prix (€)<input name="price" type="number" min="0.01" step="0.01" required></label><label>Durée<select name="duration"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></label><label class="admin-check"><input name="eligible" type="checkbox" checked> Éligible à la fidélité</label><button type="submit">Créer la prestation</button></form><p id="service-message" class="admin-message" role="status" aria-live="polite"></p></section>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Avis à modérer</h2><span class="muted">Publication après validation de Thomas</span></div><div id="review-list" class="admin-list"></div></section>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Clients</h2><label class="muted">Rechercher <input id="client-search" type="search" maxlength="100" placeholder="Nom, e-mail ou téléphone"></label></div><div id="client-list" class="admin-list"></div></section>
+   <section class="admin-settings"><div class="admin-section-heading"><h2>Journal d’audit</h2><span class="muted">Actions sensibles horodatées</span></div><div id="audit-events" class="admin-list"></div></section>
+   <div class="admin-section-heading"><h2>Rendez-vous</h2><label class="muted">Filtrer <select id="status-filter"><option value="">Tous les statuts</option><option>PENDING</option><option>CONFIRMED</option><option>COMPLETED</option><option>NO_SHOW</option><option>CANCELLED</option><option>REJECTED</option></select></label></div>
+   <div id="appointments" class="admin-list"></div><p id="dashboard-message" class="admin-message" role="status" aria-live="polite"></p>
+  </section>
+  <dialog id="modify-dialog" class="admin-dialog"><form id="modify-form" class="admin-form"><h2>Modifier le rendez-vous</h2><input name="appointmentId" type="hidden"><input name="version" type="hidden"><label>Prestation<select name="serviceId" required></select></label><label>Date<input name="date" type="date" required></label><label>Créneau<select name="time" required><option value="">Choisissez une date</option></select></label><p class="admin-message" role="status" aria-live="polite"></p><div class="admin-actions"><button type="button" id="modify-cancel" class="secondary">Fermer</button><button type="submit">Enregistrer</button></div></form></dialog>
+ </main><script src="/admin.js" defer></script>
+</body></html>
