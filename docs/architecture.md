@@ -5,9 +5,9 @@
 - Monolithe Node.js natif, routes HTTP JSON et pages statiques, sans dépendance npm tierce. SQLite natif sert de source de vérité pour une instance locale unique.
 - Les tables et migrations (versions 1 à 6) sont initialisées par `server.js`. La migration 6 ajoute les reçus fournisseur d’outbox. Les rendez-vous conservent les snapshots de prestation et les dates UTC avec le fuseau `Europe/Paris`.
 - `lib/booking.js` valide le compte vérifié, les horaires, le service, l’idempotence et les conflits dans une transaction; les triggers SQLite empêchent les chevauchements actifs. La route HTTP cliente est active et exige une session.
-- `lib/accounts.js` gère les challenges e-mail/téléphone et les jetons de récupération; `lib/providers.js` contient les adaptateurs Resend et Twilio. Tant que les secrets et l’URL publique ne sont pas configurés, ces parcours échouent explicitement.
-- `lib/notifications.js` maintient une outbox transactionnelle, des messages e-mail et des SMS de rendez-vous optionnels, un worker périodique, des reçus avec identifiants fournisseur et les rappels 24 h / 2 h. Les SMS rendez-vous sont désactivés par défaut; l’acceptation fournisseur reste différente de la livraison finale.
-- `lib/auth.js` utilise scrypt, des sessions à jeton aléatoire haché, cookies HttpOnly/SameSite, TOTP administrateur et secret MFA chiffré AES-256-GCM. Le serveur en production refuse de démarrer avec une clé MFA, un e-mail/SMS ou une origine HTTPS absents.
+- `lib/accounts.js` gère les vérifications d’e-mail et les jetons de récupération. Le téléphone est une coordonnée de contact obligatoire pour réserver, sans code SMS.
+- `lib/notifications.js` maintient une outbox transactionnelle pour les e-mails, un worker périodique, des reçus avec identifiants fournisseur et les rappels 24 h / 2 h. Les SMS sont désactivés pour le lancement.
+- `lib/auth.js` utilise scrypt, des sessions à jeton aléatoire haché, cookies HttpOnly/SameSite, TOTP administrateur et secret MFA chiffré AES-256-GCM. Le serveur en production refuse de démarrer sans clé MFA, fournisseur e-mail, URL HTTPS ou base PostgreSQL.
 - `lib/appointments.js`, `lib/cancellations.js`, `lib/payments.js`, `lib/loyalty.js` couvrent transitions autorisées, annulations, paiements sur place et ledger/récompenses. Une récompense réservée est restaurée lors d'une annulation, d'un refus ou d'un NO_SHOW; elle n'est consommée qu'après COMPLETED. Les corrections de paiement sont ajoutées comme événements immuables avec motif obligatoire et auteur horodaté.
 - `lib/dashboard.js` calcule les statistiques depuis les données de l’établissement. Les pages admin offrent les opérations disponibles et le journal d’audit.
 
@@ -17,7 +17,7 @@ Variables requises pour les fonctions clientes réelles :
 
 - `CUTLY_PUBLIC_BASE_URL` : origine HTTPS publique et stable en production.
 - `RESEND_API_KEY`, `CUTLY_EMAIL_FROM` : envoi e-mail transactionnel; le domaine d’envoi doit être validé auprès du fournisseur.
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` et soit `TWILIO_FROM`, soit `TWILIO_MESSAGING_SERVICE_SID` : SMS Twilio, avec expéditeur et destination conformes au pays.
+- SMS/Twilio : non configuré et hors du parcours de lancement ; le téléphone est une coordonnée de contact, pas une vérification.
 - `CUTLY_MFA_ENCRYPTION_KEY` : clé base64 décodant en 32 octets; elle doit rester stable pour déchiffrer le MFA de l’administrateur.
 
 Ne pas placer ces valeurs dans le dépôt. L’absence de configuration n’est pas remplacée par un transport simulé.

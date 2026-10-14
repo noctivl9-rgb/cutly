@@ -86,9 +86,9 @@ test('booking cannot bypass required verified account',async()=>{
  const cancellation=await fetch(`${baseUrl}/api/client/appointments/unknown/cancellation`,{method:'POST',headers:{origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({})});assert.equal(cancellation.status,401);
 });
 
-test('unconfigured providers are reported honestly',async()=>{
+test('unconfigured email blocks account verification while SMS is not required',async()=>{
  const status=await (await fetch(`${baseUrl}/api/status`)).json();
- assert.equal(status.emailProvider,'NOT_CONFIGURED');assert.equal(status.smsProvider,'NOT_CONFIGURED');assert.equal(status.adminMfa,'CONFIGURED');assert.equal(status.booking,'BLOCKED');assert.equal(status.smsAppointmentNotifications,'DISABLED');assert.ok(status.blockers.includes('EMAIL_PROVIDER_NOT_CONFIGURED'));assert.ok(status.blockers.includes('SMS_PROVIDER_NOT_CONFIGURED'));
+ assert.equal(status.emailProvider,'NOT_CONFIGURED');assert.equal(status.adminMfa,'CONFIGURED');assert.equal(status.booking,'BLOCKED');assert.equal(status.smsAppointmentNotifications,'DISABLED');assert.ok(status.blockers.includes('EMAIL_PROVIDER_NOT_CONFIGURED'));assert.ok(!status.blockers.includes('SMS_PROVIDER_NOT_CONFIGURED'));assert.equal(status.verificationMode,'EMAIL_ONLY_PHONE_CONTACT');
  const blocked=await fetch(`${baseUrl}/api/auth/client/register`,{method:'POST',headers:{'content-type':'application/json',origin:baseUrl},body:JSON.stringify({firstName:'Test',lastName:'Client',email:'blocked@example.test',phone:'+33612345678',password:'a-strong-test-password'})});assert.equal(blocked.status,503);
 });
 
@@ -97,11 +97,11 @@ test('client verification and password recovery challenges are one-time and expi
  const previousKey=process.env.CUTLY_MFA_ENCRYPTION_KEY;process.env.CUTLY_MFA_ENCRYPTION_KEY=mfaEncryptionKey;
  try{
   db.exec('PRAGMA foreign_keys=ON');const messages=[];
-  const account=await registerClient(db,{firstName:'Test',lastName:'Client',email:'journey@example.test',phone:'+33612345671',password:'a-strong-test-password'},{sendEmail:async message=>messages.push({channel:'EMAIL',...message}),sendSms:async message=>messages.push({channel:'SMS',...message})});
-  assert.equal(account.verificationRequired.email,true);assert.equal(account.verificationRequired.phone,true);assert.equal(messages.length,2);
-  const email=messages.find(message=>message.channel==='EMAIL'),sms=messages.find(message=>message.channel==='SMS');
+  const account=await registerClient(db,{firstName:'Test',lastName:'Client',email:'journey@example.test',phone:'+33612345671',password:'a-strong-test-password'},{sendEmail:async message=>messages.push({channel:'EMAIL',...message})});
+  assert.equal(account.verificationRequired.email,true);assert.equal(account.verificationRequired.phone,false);assert.equal(messages.length,1);
+  assert.equal(db.prepare('SELECT phone FROM users WHERE id=?').get(account.userId).phone,'+33612345671');
+  const email=messages.find(message=>message.channel==='EMAIL');
   assert.deepEqual(await verifyEmail(db,{token:email.token}),{verified:true});await assert.rejects(()=>verifyEmail(db,{token:email.token}),/invalid_or_expired_token/);
-  assert.deepEqual(await verifyPhone(db,{email:account.email,code:sms.code}),{verified:true});assert.deepEqual(await verifyPhone(db,{email:account.email,code:sms.code}),{verified:true});
   await requestPasswordReset(db,{email:account.email,sendEmail:async message=>messages.push({channel:'RESET',...message})});
   const reset=messages.find(message=>message.channel==='RESET');assert.ok(reset.token);assert.equal((await resetClientPassword(db,{token:reset.token,newPassword:'another-strong-password'})).reset,true);
   await assert.rejects(()=>resetClientPassword(db,{token:reset.token,newPassword:'yet-another-password'}),/invalid_or_expired_token/);
@@ -131,8 +131,8 @@ test('admin HTTP routes require password, TOTP, an active membership and a valid
  const clientLogin=await fetch(`${baseUrl}/api/auth/client/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'http-client@example.com',password:'client-password-safe-123'})});assert.equal(clientLogin.status,200);clientCookie=clientLogin.headers.get('set-cookie').split(';')[0];
  const personalExport=await fetch(`${baseUrl}/api/client/export`,{headers:{cookie:clientCookie}});assert.equal(personalExport.status,200);assert.equal((await personalExport.json()).user.email,'http-client@example.com');assert.match(personalExport.headers.get('content-disposition'),/attachment/);
  const profile=await (await fetch(`${baseUrl}/api/client/profile`,{headers:{cookie:clientCookie}})).json();assert.equal(profile.email,'http-client@example.com');assert.equal(profile.version,1);
- const profileUpdate=await fetch(`${baseUrl}/api/client/profile`,{method:'PATCH',headers:{cookie:clientCookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:1,firstName:'Client modifié',lastName:'Test',language:'fr'})});assert.equal(profileUpdate.status,200);
- const staleProfile=await fetch(`${baseUrl}/api/client/profile`,{method:'PATCH',headers:{cookie:clientCookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:1,firstName:'Autre',lastName:'Test',language:'fr'})});assert.equal(staleProfile.status,409);
+ const profileUpdate=await fetch(`${baseUrl}/api/client/profile`,{method:'PATCH',headers:{cookie:clientCookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:1,firstName:'Client modifié',lastName:'Test',language:'fr',phone:'+33612345672'})});assert.equal(profileUpdate.status,200);
+ const staleProfile=await fetch(`${baseUrl}/api/client/profile`,{method:'PATCH',headers:{cookie:clientCookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:1,firstName:'Autre',lastName:'Test',language:'fr',phone:'+33612345672'})});assert.equal(staleProfile.status,409);
  const clientAppointments=await (await fetch(`${baseUrl}/api/client/appointments`,{headers:{cookie:clientCookie}})).json();assert.equal(clientAppointments.appointments.length,2);
  assert.deepEqual((await (await fetch(`${baseUrl}/api/client/loyalty`,{headers:{cookie:clientCookie}})).json()).rewards,[]);
  const adminClients=await fetch(`${baseUrl}/api/admin/clients?q=http-client`,{headers:{cookie}});assert.equal(adminClients.status,200);assert.equal((await adminClients.json()).clients.length,1);
@@ -249,15 +249,20 @@ test('booking service requires verified identity and creates an idempotent histo
    VALUES('verified-client','verified@example.com','+33612345678','Camille','Martin','test-hash',?,?,?,?)`).run(now.toISOString(),now.toISOString(),now.toISOString(),now.toISOString());
   db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,created_at,updated_at)
    VALUES('unverified-client','unverified@example.com','+33612345679','Alex','Durand','test-hash',?,?,?)`).run(now.toISOString(),now.toISOString(),now.toISOString());
+  db.prepare('UPDATE users SET phone_verified_at=NULL WHERE id=?').run('verified-client');
+  db.prepare('UPDATE users SET email_verified_at=NULL WHERE id=?').run('unverified-client');
+
   const input={userId:'verified-client',serviceId:'coupe-classique',date:saturday,time:'09:00',idempotencyKey:'booking-test-key-0001',now},previousSmsSetting=process.env.CUTLY_SMS_APPOINTMENT_NOTIFICATIONS;process.env.CUTLY_SMS_APPOINTMENT_NOTIFICATIONS='true';
   const first=await createBooking(db,input),retry=await createBooking(db,input);if(previousSmsSetting===undefined)delete process.env.CUTLY_SMS_APPOINTMENT_NOTIFICATIONS;else process.env.CUTLY_SMS_APPOINTMENT_NOTIFICATIONS=previousSmsSetting;
   assert.deepEqual(retry,first);assert.equal(first.status,'PENDING');assert.equal(first.priceCents,500);assert.equal(first.durationMinutes,30);
   assert.equal(db.prepare('SELECT COUNT(*) AS count FROM appointments WHERE id=?').get(first.id).count,1);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE appointment_id=? AND channel='SMS' AND kind='booking_requested:client'").get(first.id).count,1);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE appointment_id=? AND channel='SMS'").get(first.id).count,0);
   const snapshot=db.prepare('SELECT service_name_snapshot,price_cents_snapshot,duration_minutes_snapshot FROM appointments WHERE id=?').get(first.id);
   assert.deepEqual(Object.values(snapshot),['Coupe classique',500,30]);
   await assert.rejects(()=>createBooking(db,{...input,userId:'unverified-client',idempotencyKey:'booking-test-key-0002'}),e=>e instanceof BookingError&&e.code==='account_verification_required');
   await assert.rejects(()=>createBooking(db,{...input,time:'09:15',idempotencyKey:'booking-test-key-0003'}),e=>e instanceof BookingError&&e.code==='slot_unavailable');
+  db.prepare('UPDATE users SET phone=NULL WHERE id=?').run('verified-client');
+  await assert.rejects(()=>createBooking(db,{...input,idempotencyKey:'booking-test-key-0004',time:'09:30'}),e=>e instanceof BookingError&&e.code==='phone_contact_required');
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM appointments WHERE client_email='verified@example.com'").get().count,1);
  }finally{db.close();}
 });
@@ -463,7 +468,7 @@ test('simultaneous bookings for one provider serialize and only one request rece
  const source=path.join(tempDir,'cutly.sqlite'),isolated=path.join(tempDir,'concurrent-booking.sqlite');fs.copyFileSync(source,isolated);
  const db=createDatabase({sqlitePath:isolated}),stamp=new Date().toISOString(),clientId='concurrent-client';
  try{
-  await db.prepare(`INSERT INTO users(id,email,first_name,last_name,password_hash,email_verified_at,phone_verified_at,role,created_at,updated_at) VALUES(?,?, 'Concurrent','Client','test-hash',?,?,'CLIENT',?,?)`).run(clientId,'concurrent@example.test',stamp,stamp,stamp,stamp);
+  await db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,role,created_at,updated_at) VALUES(?,?,?,'Concurrent','Client','test-hash',?,'CLIENT',?,?)`).run(clientId,'concurrent@example.test','+33612345670',stamp,stamp,stamp);
   const [saturday]=upcomingWeekend(2),results=await Promise.allSettled([
    createBooking(db,{userId:clientId,serviceId:'coupe-classique',date:saturday,time:'09:00',idempotencyKey:'concurrent-booking-key-0001'}),
    createBooking(db,{userId:clientId,serviceId:'coupe-classique',date:saturday,time:'09:00',idempotencyKey:'concurrent-booking-key-0002'})

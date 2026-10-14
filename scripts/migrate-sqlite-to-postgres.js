@@ -58,7 +58,7 @@ function inspectSource(sourcePath) {
 async function migrate({ sqlitePath, backupPath, databaseUrl }) {
  if (!sqlitePath || !fs.existsSync(sqlitePath)) throw new Error('sqlite_database_not_found');
  if (!backupPath) throw new Error('backup_path_required');
- if (!databaseUrl) throw new Error('CUTLY_DATABASE_URL_or_NETLIFY_DB_URL_required');
+ if (!databaseUrl) throw new Error('CUTLY_DATABASE_URL_or_DATABASE_URL_required');
 
  // The backup is complete and independently verified before any target change.
  const verifiedBackup = makeBackup(sqlitePath, backupPath);
@@ -107,7 +107,7 @@ if (require.main === module) {
  const sqlitePath = path.resolve(getArg('--sqlite') || process.env.CUTLY_DB_PATH || path.join(__dirname, '..', 'data', 'cutly.sqlite'));
  const timestamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
  const backupPath = getArg('--backup') || path.join(path.dirname(sqlitePath), 'backups', `cutly-pre-postgres-${timestamp}.sqlite`);
- migrate({ sqlitePath, backupPath, databaseUrl: process.env.CUTLY_DATABASE_URL || process.env.NETLIFY_DB_URL })
+ migrate({ sqlitePath, backupPath, databaseUrl: process.env.CUTLY_DATABASE_URL || process.env.DATABASE_URL || process.env.NETLIFY_DB_URL })
   .then(result => console.log(JSON.stringify({ migrated: true, backup: result.backupPath, rowCounts: result.counts }, null, 2)))
   .catch(error => { console.error('Migration stopped:', error.message); process.exitCode = 1; });
 }

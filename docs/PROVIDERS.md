@@ -12,7 +12,9 @@ Cette procédure n’a créé aucun compte ni envoyé de message. Les noms des v
 
 L’adaptateur confirme l’acceptation API de Resend, ce qui ne garantit pas à lui seul la livraison finale. Les erreurs et les tentatives sont consignées dans l’outbox locale; aucune webhook Resend de livraison/désabonnement n’est configurée.
 
-## Twilio — SMS
+## Twilio — non utilisé au lancement
+
+La décision actuelle est de vérifier uniquement l’e-mail et de demander un téléphone comme coordonnée de contact. Aucun compte Twilio, secret, numéro expéditeur ou envoi SMS n’est nécessaire pour mettre en place ce parcours. La section ci-dessous est conservée comme documentation d’évolution future et ne fait pas partie du déploiement courant.
 
 1. Créer/choisir un compte Twilio et vérifier l’identité du compte.
 2. Dans la console, choisir un numéro compatible pour la France ou un Messaging Service, suivre les exigences réglementaires et l’enregistrement de l’expéditeur indiqués par Twilio.

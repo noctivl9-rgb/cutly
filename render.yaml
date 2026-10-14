@@ -2,13 +2,11 @@ services:
   - type: web
     name: cutly-thomas-shop
     runtime: node
-    # Paid production compute. Applying this Blueprint creates billable resources;
-    # review the current Render pricing and approve it before syncing.
-    plan: 0.5c-512mb
+    plan: free
     region: frankfurt
     numInstances: 1
     autoDeployTrigger: 'off'
-    buildCommand: npm run check && npm test
+    buildCommand: npm run build && npm test
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
@@ -17,9 +15,7 @@ services:
       - key: CUTLY_HOST
         value: 0.0.0.0
       - key: CUTLY_DATABASE_URL
-        fromDatabase:
-          name: cutly-postgres
-          property: connectionString
+        sync: false
       - key: CUTLY_PUBLIC_BASE_URL
         sync: false
       - key: CUTLY_MFA_ENCRYPTION_KEY
@@ -28,25 +24,5 @@ services:
         sync: false
       - key: CUTLY_EMAIL_FROM
         sync: false
-      - key: TWILIO_ACCOUNT_SID
+      - key: CUTLY_JOB_TOKEN
         sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_FROM
-        sync: false
-      - key: TWILIO_MESSAGING_SERVICE_SID
-        sync: false
-      - key: CUTLY_SMS_APPOINTMENT_NOTIFICATIONS
-        value: "false"
-
-databases:
-  - name: cutly-postgres
-    databaseName: cutly
-    user: cutly
-    plan: 0.5c-1g
-    region: frankfurt
-    postgresMajorVersion: "18"
-    diskSizeGB: 5
-    ipAllowList: []
-    # Applying this Blueprint creates a paid database with Render-managed recovery.
-    # Do not sync it until the owner approves the current costs and retention needs.

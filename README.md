@@ -1,6 +1,6 @@
 # CUTLY
 
-Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite en développement local et PostgreSQL en hébergement. Netlify est la cible d’hébergement choisie ; le site n’est pas encore déployé publiquement.
+Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite en développement local et PostgreSQL en hébergement. Render est la cible d’hébergement préparée ; le site n’est pas encore déployé publiquement.
 
 ## Démarrage local
 
@@ -18,7 +18,7 @@ npm test
 npm audit --omit=dev
 ```
 
-Les tests utilisent SQLite temporaire. Ils ne remplacent pas une validation PostgreSQL réelle, les essais de vrais e-mails/SMS ni les vérifications de production.
+Les tests utilisent SQLite temporaire. Ils ne remplacent pas une validation PostgreSQL réelle, l’essai d’e-mails réels ni les vérifications de production.
 
 ## Compte administrateur
 
@@ -26,7 +26,7 @@ Les tests utilisent SQLite temporaire. Ils ne remplacent pas une validation Post
 
 ## Réservations, paiements et fidélité
 
-La double vérification e-mail/téléphone est obligatoire avant toute réservation. Sans configuration réelle de Resend et Twilio, les envois ne sont pas simulés et la réservation reste bloquée. Les paiements sont sur place. Les avis attendent l’approbation de Thomas. Une récompense réservée est restituée après un `NO_SHOW` et consommée uniquement lorsque la prestation est marquée `COMPLETED`.
+Le client vérifie son e-mail et fournit un numéro de téléphone de contact avant de réserver. Aucun SMS ni code téléphonique n’est requis. Tant que Resend n’est pas configuré, les e-mails réels ne partent pas et la réservation reste bloquée. Les paiements sont sur place. Les avis attendent l’approbation de Thomas. Une récompense réservée est restituée après un `NO_SHOW` et consommée uniquement lorsque la prestation est marquée `COMPLETED`.
 
 Le brouillon de confidentialité et les parcours d’export/demande ne constituent pas une validation juridique RGPD. Les durées de conservation, les sous-traitants et les règles de suppression/anonymisation restent à valider.
 
@@ -40,8 +40,8 @@ La PWA utilise un cache limité à la page hors connexion, à la page d’instal
 
 ## Dépôt et hébergement
 
-Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly), branche `main`. Netlify est l’hébergeur demandé. La configuration du site et de la fonction se trouve dans `netlify.toml` et `netlify/functions/api.js`. Le guide est dans [docs/NETLIFY_DEPLOYMENT.md](docs/NETLIFY_DEPLOYMENT.md).
+Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly), branche `main`. Render Free est la cible préparée avec PostgreSQL externe gratuit ; consultez [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour les limites et les étapes. Le site client et `/admin.html` partagent la même application en ligne.
 
-Le fichier `render.yaml` est conservé comme ancien travail de préparation et n’est pas la cible retenue. La migration SQLite vers PostgreSQL doit être précédée d’une sauvegarde vérifiée ; voir [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md).
+Les fichiers Netlify sont conservés pour les anciens essais locaux, mais Render est la cible active. La migration SQLite vers PostgreSQL doit être précédée d’une sauvegarde vérifiée ; voir [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md).
 
 L’état de préparation, les limitations et les étapes encore nécessaires figurent dans [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). Voir aussi [docs/PROVIDERS.md](docs/PROVIDERS.md) et [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).

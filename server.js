@@ -5,8 +5,8 @@ const crypto = require('node:crypto');
 const { createDatabase } = require('./lib/database');
 const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessionFromRequest, cookieHeader, logout, mfaKey } = require('./lib/auth');
 const { createBooking } = require('./lib/booking');
-const { registerClient, resendClientVerification, verifyEmail, verifyPhone, requestPasswordReset, resetClientPassword } = require('./lib/accounts');
-const { emailConfigured, smsConfigured, publicBaseUrl, sendVerificationEmail, sendPhoneCode, providerStatus } = require('./lib/providers');
+const { registerClient, resendClientVerification, verifyEmail, requestPasswordReset, resetClientPassword } = require('./lib/accounts');
+const { emailConfigured, publicBaseUrl, sendVerificationEmail, providerStatus } = require('./lib/providers');
 const { transitionAppointment, modifyAppointment } = require('./lib/appointments');
 const { recordOnsitePayment, correctOnsitePayment } = require('./lib/payments');
 const { submitReview, decideReview } = require('./lib/reviews');
@@ -20,16 +20,16 @@ const { withTransaction } = require('./lib/database');
 function assertProductionConfiguration(){
  if(!mfaKey())throw new Error('Production requires CUTLY_MFA_ENCRYPTION_KEY (base64-encoded 32-byte key).');
  if(!emailConfigured())throw new Error('Production requires RESEND_API_KEY and CUTLY_EMAIL_FROM.');
- if(!smsConfigured())throw new Error('Production requires Twilio credentials and a sender or messaging service.');
+
  try{publicBaseUrl();}catch{throw new Error('Production requires a valid HTTPS CUTLY_PUBLIC_BASE_URL.');}
- if(!(process.env.CUTLY_DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or NETLIFY_DB_URL for PostgreSQL.');
+ if(!(process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or DATABASE_URL for PostgreSQL.');
 }
 if(process.env.NODE_ENV==='production')assertProductionConfiguration();
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_PATH = process.env.CUTLY_DB_PATH || path.join(DATA_DIR, 'cutly.sqlite');
-const DATABASE_URL=process.env.CUTLY_DATABASE_URL||process.env.NETLIFY_DB_URL;
+const DATABASE_URL=process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL;
 if(!DATABASE_URL)fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const db = createDatabase({url:DATABASE_URL,sqlitePath:DB_PATH});
 const shop = {
@@ -289,22 +289,20 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/api/auth/client/register'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
     if(!await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get())return json(res,503,{error:'administrator_not_initialized'});
-   if(!emailConfigured()||!smsConfigured())return json(res,503,{error:'verification_providers_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-    try{const account=await registerClient(db,body,{sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)});const session=await createSession(db,account.userId,req.headers['user-agent']);return json(res,201,{email:account.email,verificationRequired:account.verificationRequired},{'set-cookie':cookieHeader(session.token)});}catch(error){return adminFailure(res,error);}
+   if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
+    try{const account=await registerClient(db,body,{sendEmail:message=>sendVerificationEmail(message)});const session=await createSession(db,account.userId,req.headers['user-agent']);return json(res,201,{email:account.email,verificationRequired:account.verificationRequired},{'set-cookie':cookieHeader(session.token)});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/resend-verification'){
-   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured()||!smsConfigured())return json(res,503,{error:'verification_providers_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-   try{return json(res,202,await resendClientVerification(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)}));}catch(error){return adminFailure(res,error);}
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
+   try{return json(res,202,await resendClientVerification(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message)}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-email'){
     if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await verifyEmail(db,{token:body.token}));}catch(error){return adminFailure(res,error);}
   }
-  if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-phone'){
-    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,8,15*60*1000))return json(res,429,{error:'too_many_attempts'});try{return json(res,200,await verifyPhone(db,{email:body.email,code:body.code}));}catch(error){return adminFailure(res,error);}
-  }
+  if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-phone')return json(res,410,{error:'phone_verification_not_required'});
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-   try{await requestPasswordReset(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message)});return json(res,202,{accepted:true});}catch(error){return adminFailure(res,error);}
+   try{await requestPasswordReset(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)});return json(res,202,{accepted:true});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset/confirm'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await resetClientPassword(db,{token:body.token,newPassword:body.newPassword}));}catch(error){return adminFailure(res,error);}
@@ -359,7 +357,8 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='PATCH'&&url.pathname==='/api/client/profile'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});
    const body=await readBody(req);if(!Number.isSafeInteger(body.version)||body.version<1)return json(res,400,{error:'version_required'});if(typeof body.firstName!=='string'||!body.firstName.trim()||body.firstName.trim().length>80||typeof body.lastName!=='string'||!body.lastName.trim()||body.lastName.trim().length>80||!['fr','en'].includes(body.language))return json(res,400,{error:'invalid_profile'});
-    const updatedAt=new Date().toISOString();const updated=await withTransaction(db,async tx=>{const result=await tx.prepare('UPDATE users SET first_name=?,last_name=?,preferred_language=?,version=version+1,updated_at=? WHERE id=? AND role=\'CLIENT\' AND version=? AND disabled_at IS NULL').run(body.firstName.trim(),body.lastName.trim(),body.language,updatedAt,session.user_id,body.version);if(result.changes!==1)return false;await tx.prepare(`INSERT INTO audit_events(id,actor_id,action,object_type,object_id,after_json,result,created_at) VALUES(?,?,'CLIENT_PROFILE_UPDATED','USER',?,?,'SUCCESS',?)`).run(crypto.randomUUID(),session.user_id,session.user_id,JSON.stringify({firstName:body.firstName.trim(),lastName:body.lastName.trim(),language:body.language}),updatedAt);return true;});if(!updated)return json(res,409,{error:'version_conflict'});return json(res,200,{ok:true,version:body.version+1});
+    const phone=typeof body.phone==='string'?body.phone.trim():'';if(!/^\+[1-9]\d{7,14}$/.test(phone))return json(res,400,{error:'invalid_phone_e164'});
+    const updatedAt=new Date().toISOString();let outcome;try{outcome=await withTransaction(db,async tx=>{const current=await tx.prepare("SELECT phone FROM users WHERE id=? AND role='CLIENT' AND disabled_at IS NULL AND version=?").get(session.user_id,body.version);if(!current)return 'version_conflict';if(await tx.prepare('SELECT 1 FROM users WHERE phone=? AND id<>?').get(phone,session.user_id))return 'phone_already_in_use';const result=await tx.prepare('UPDATE users SET phone=?,first_name=?,last_name=?,preferred_language=?,version=version+1,updated_at=? WHERE id=? AND role=\'CLIENT\' AND version=? AND disabled_at IS NULL').run(phone,body.firstName.trim(),body.lastName.trim(),body.language,updatedAt,session.user_id,body.version);if(result.changes!==1)return 'version_conflict';await tx.prepare(`INSERT INTO audit_events(id,actor_id,action,object_type,object_id,before_json,after_json,result,created_at) VALUES(?,?,'CLIENT_PROFILE_UPDATED','USER',?,?,?,'SUCCESS',?)`).run(crypto.randomUUID(),session.user_id,session.user_id,JSON.stringify({phone:current.phone}),JSON.stringify({phone,firstName:body.firstName.trim(),lastName:body.lastName.trim(),language:body.language}),updatedAt);return 'ok';});}catch(error){if(error.code==='SQLITE_CONSTRAINT_UNIQUE'||error.code==='23505')return json(res,409,{error:'phone_already_in_use'});throw error;}if(outcome!=='ok')return json(res,409,{error:outcome});return json(res,200,{ok:true,version:body.version+1,phone});
   }
   if(req.method==='POST'&&url.pathname==='/api/client/password'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});
@@ -478,7 +477,7 @@ const server=http.createServer(async(req,res)=>{
   }
   if(req.method==='GET'&&url.pathname==='/api/reviews')return json(res,200,{reviews:(await db.prepare("SELECT r.rating,r.comment,r.created_at AS createdAt FROM reviews r JOIN appointments a ON a.id=r.appointment_id WHERE r.status='PUBLISHED' AND a.establishment_id='thomas-shop' ORDER BY r.created_at DESC LIMIT 30").all())});
   if(req.method==='GET'&&url.pathname==='/api/shop') return json(res,200,{...shop,timezone:'Europe/Paris',hours:(await db.prepare("SELECT weekday,opens AS open,closes AS close FROM opening_hours WHERE establishment_id='thomas-shop' ORDER BY weekday").all()).map(item=>({...item,day:new Intl.DateTimeFormat('fr-FR',{weekday:'long',timeZone:'Europe/Paris'}).format(new Date(Date.UTC(2026,0,4+item.weekday,12)))})),services:await publicServices()});
-  if(req.method==='GET'&&url.pathname==='/api/status'){const providers=providerStatus();let baseConfigured=false;try{publicBaseUrl();baseConfigured=true;}catch{}const adminReady=Boolean((await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get()));const blockers=[];if(providers.email!=='CONFIGURED')blockers.push('EMAIL_PROVIDER_NOT_CONFIGURED');if(providers.sms!=='CONFIGURED')blockers.push('SMS_PROVIDER_NOT_CONFIGURED');if(!baseConfigured)blockers.push('PUBLIC_HTTPS_URL_NOT_CONFIGURED');if(!mfaKey())blockers.push('MFA_ENCRYPTION_KEY_NOT_CONFIGURED');if(!adminReady)blockers.push('ADMIN_NOT_INITIALIZED');return json(res,200,{booking:blockers.length?'BLOCKED':'READY',blockers,emailProvider:providers.email,smsProvider:providers.sms,smsAppointmentNotifications:process.env.CUTLY_SMS_APPOINTMENT_NOTIFICATIONS==='true'?'ENABLED':'DISABLED',publicBaseUrl:baseConfigured?'CONFIGURED':'NOT_CONFIGURED',adminMfa:mfaKey()?'CONFIGURED':'NOT_CONFIGURED',admin:adminReady?'INITIALIZED':'NOT_INITIALIZED',database:db.kind});}
+  if(req.method==='GET'&&url.pathname==='/api/status'){const providers=providerStatus();let baseConfigured=false;try{publicBaseUrl();baseConfigured=true;}catch{}const adminReady=Boolean((await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get()));const blockers=[];if(providers.email!=='CONFIGURED')blockers.push('EMAIL_PROVIDER_NOT_CONFIGURED');if(!baseConfigured)blockers.push('PUBLIC_HTTPS_URL_NOT_CONFIGURED');if(!mfaKey())blockers.push('MFA_ENCRYPTION_KEY_NOT_CONFIGURED');if(!adminReady)blockers.push('ADMIN_NOT_INITIALIZED');return json(res,200,{booking:blockers.length?'BLOCKED':'READY',blockers,emailProvider:providers.email,verificationMode:'EMAIL_ONLY_PHONE_CONTACT',smsAppointmentNotifications:'DISABLED',publicBaseUrl:baseConfigured?'CONFIGURED':'NOT_CONFIGURED',adminMfa:mfaKey()?'CONFIGURED':'NOT_CONFIGURED',admin:adminReady?'INITIALIZED':'NOT_INITIALIZED',database:db.kind});}
   if(req.method==='GET'&&url.pathname==='/api/availability'){
    const service=await findService(url.searchParams.get('service'),shop.id); if(!service)return json(res,404,{error:'service_not_found'});
    return json(res,200,{date:url.searchParams.get('date'),timezone:'Europe/Paris',slots:await available(url.searchParams.get('date'),service)});
@@ -502,7 +501,7 @@ const databaseReady=initializePostgres();
 if(require.main===module){
  databaseReady.then(()=>{
   server.listen(port,host,()=>console.log(`CUTLY listening on ${host}:${server.address().port}`));
-  if(emailConfigured()||smsConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),15_000);worker.unref();}
+  if(emailConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),15_000);worker.unref();}
  }).catch(async error=>{console.error('CUTLY database initialization failed',error.code||'database_error');await db.close().catch(()=>{});process.exitCode=1;});
  let shuttingDown=false;function shutdown(){if(shuttingDown)return;shuttingDown=true;const timeout=setTimeout(()=>process.exit(1),10_000);timeout.unref();server.close(async()=>{await db.close();clearTimeout(timeout);process.exit(0);});}
  process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);

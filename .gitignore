@@ -9,3 +9,4 @@ backups/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+.neon

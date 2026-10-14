@@ -1,4 +1,6 @@
-# Préparation de l’hébergement Netlify
+# Archive historique — Netlify (non utilisé)
+
+Cette procédure est obsolète. La cible d’hébergement choisie est Render ; consulter [docs/DEPLOYMENT.md](DEPLOYMENT.md). Les choix actuels de vérification e-mail uniquement et numéro de téléphone comme contact remplacent les anciens passages ci-dessous.
 
 État vérifié le 13 octobre 2026. Le compte Netlify a été ouvert, mais aucun site CUTLY, base PostgreSQL, URL publique ni fournisseur de notifications n’a été connecté. Le site RIHLA existant dans le compte n’est pas CUTLY et ne doit pas être modifié.
 

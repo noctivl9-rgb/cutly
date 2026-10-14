@@ -19,7 +19,7 @@ function backupPostgres({databaseUrl,destination,binDirectory=''}){
  return {path:output,archiveReadable:true,restorationTested:false};
 }
 if(require.main===module){
- try{console.log(JSON.stringify(backupPostgres({databaseUrl:process.env.CUTLY_DATABASE_URL||process.env.NETLIFY_DB_URL,destination:process.argv[2],binDirectory:process.env.CUTLY_PG_BIN||''})));}
+ try{console.log(JSON.stringify(backupPostgres({databaseUrl:process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL,destination:process.argv[2],binDirectory:process.env.CUTLY_PG_BIN||''})));}
  catch(error){console.error(error.code==='EEXIST'?'backup_destination_already_exists':error.message.startsWith('postgres_')?error.message:'backup_configuration_invalid');process.exitCode=1;}
 }
 module.exports={backupPostgres};
