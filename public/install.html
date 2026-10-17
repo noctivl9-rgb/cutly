@@ -2,30 +2,48 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f6f2">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f0e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CUTLY">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="Ajoutez CUTLY à l’écran d’accueil de votre téléphone.">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/mobile-app.css">
   <link rel="stylesheet" href="/install.css">
   <script src="/pwa.js" defer></script>
   <title>Installer CUTLY</title>
 </head>
 <body>
-  <main class="wrap">
-    <a class="brand" href="/" aria-label="CUTLY, accueil">CUTLY</a>
-    <p class="eyebrow">THOMAS SHOP · BOULOGNE-BILLANCOURT</p>
+  <header class="app-header"><a class="brand" href="/" aria-label="CUTLY, accueil"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path class="brand-c" d="M21.75 11.18A7.5 7.5 0 1 0 21.75 20.82"/><path class="brand-gap" d="M10.2 21.8 21.8 10.2"/><path class="brand-cut" d="M8.6 23.4 23.4 8.6"/></svg><span class="brand-word">CUTLY</span></a><a class="header-link" href="/">Accueil</a></header>
+  <main class="app-main install-main" id="main">
+    <section class="install-hero"><span class="install-icon" aria-hidden="true"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path class="brand-c" d="M21.75 11.18A7.5 7.5 0 1 0 21.75 20.82"/><path class="brand-gap" d="M10.2 21.8 21.8 10.2"/><path class="brand-cut" d="M8.6 23.4 23.4 8.6"/></svg></span><p class="eyebrow">Thomas Shop · Boulogne-Billancourt</p>
     <h1>Votre rendez-vous, à portée de main.</h1>
-    <p>Ajoutez CUTLY à l’écran d’accueil pour retrouver rapidement les prestations et vos rendez-vous. Une connexion Internet reste nécessaire pour réserver ou consulter les informations du compte.</p>
-    <button class="button" data-install-app hidden>Installer CUTLY</button>
+    <p>Ajoutez CUTLY à l’écran d’accueil pour retrouver rapidement les prestations et vos rendez-vous. Une connexion Internet reste nécessaire pour réserver ou consulter les informations du compte.</p></section>
+    <button class="button full" type="button" data-install-app hidden>Installer CUTLY</button>
+    <section class="install-help" data-install-help hidden aria-live="polite">
+      <p class="install-help-title" data-install-help-title>Installation sur votre appareil</p>
+      <ol data-install-help-steps></ol>
+    </section>
     <p data-install-status role="status" aria-live="polite"></p>
-    <h2>Sur iPhone ou iPad</h2>
-    <ol class="steps"><li>Ouvrez CUTLY dans Safari.</li><li>Touchez le bouton de partage.</li><li>Choisissez « Sur l’écran d’accueil », puis « Ajouter ».</li></ol>
-    <h2>Sur Android</h2>
-    <ol class="steps"><li>Ouvrez CUTLY dans Chrome.</li><li>Ouvrez le menu du navigateur.</li><li>Touchez « Installer l’application » ou « Ajouter à l’écran d’accueil » si l’option est proposée.</li></ol>
+    <section data-install-platform="ios" hidden>
+      <h2>Sur iPhone ou iPad</h2>
+      <p data-install-safari-note hidden>Pour l’ajouter à l’écran d’accueil, ouvrez cette page dans Safari.</p>
+      <ol class="steps"><li>Touchez Partager dans Safari.</li><li>Choisissez « Sur l’écran d’accueil ».</li><li>Activez « Ouvrir comme app web », puis touchez « Ajouter ».</li></ol>
+    </section>
+    <section data-install-platform="android" hidden>
+      <h2>Sur Android</h2>
+      <ol class="steps"><li>Ouvrez le menu du navigateur.</li><li>Touchez « Installer l’application » ou « Ajouter à l’écran d’accueil » si l’option est proposée.</li><li>Confirmez dans la fenêtre du navigateur.</li></ol>
+    </section>
+    <section data-install-platform="desktop" hidden>
+      <h2>Sur ordinateur</h2>
+      <ol class="steps"><li>Ouvrez le menu d’installation de votre navigateur, près de la barre d’adresse.</li><li>Choisissez « Installer CUTLY » si l’option est proposée.</li></ol>
+    </section>
     <p class="note">L’option d’installation dépend du navigateur et de la version du système. CUTLY ne confirme aucune réservation sans réponse du serveur.</p>
-    <a class="back" href="/">Retour à Thomas Shop</a>
+    <a class="button secondary full" href="/">Ouvrir CUTLY</a>
   </main>
+  <nav class="bottom-nav" aria-label="Navigation principale"><a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.2 12 4l8 6.2V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></a><a href="/booking.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg><span>Réserver</span></a><a href="/appointments.html"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M8 3v4m8-4v4M3.5 10.5h17M8 14.5h3"/></svg><span>Rendez-vous</span></a><a href="/profile.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg><span>Profil</span></a></nav>
 </body>
 </html>

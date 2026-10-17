@@ -43,6 +43,40 @@ button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 ::selection { background: var(--accent-soft); color: var(--ink); }
 
+.install-dialog {
+  width: min(100% - 32px, 470px);
+  max-width: none;
+  max-height: min(90svh, 720px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid rgb(27 27 25 / 8%);
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 28px 90px rgb(20 20 18 / 24%);
+}
+.install-dialog::backdrop { background: rgb(27 27 25 / 46%); backdrop-filter: blur(8px); }
+.install-dialog[open] { animation: install-dialog-in .24s cubic-bezier(.2,.75,.25,1) both; }
+.install-dialog-card { padding: clamp(26px, 6vw, 42px); }
+.install-app-mark { display: grid; width: 52px; height: 52px; margin-bottom: 27px; place-items: center; border: 1px solid var(--ink); border-radius: 50%; font-family: var(--font-editorial); font-size: 27px; }
+.install-dialog .eyebrow { margin-bottom: 12px; }
+.install-dialog h2 { max-width: 370px; margin: 0; font-size: clamp(31px, 7vw, 42px); font-weight: 570; line-height: 1.07; letter-spacing: -.055em; }
+.install-dialog #install-description { margin: 15px 0 24px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.install-primary { width: 100%; justify-content: space-between; }
+.install-help { margin-top: 22px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.install-help[hidden] { display: none; }
+.install-help-title { margin: 0 0 9px; font-size: 14px; font-weight: 650; }
+.install-help ol { margin: 0 0 12px; padding-left: 21px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.install-help li { padding-left: 4px; }
+.install-help a { color: var(--ink); font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.install-status:empty { display: none; }
+.install-status { margin: 12px 0 0; color: var(--success); font-size: 14px; }
+.install-dialog-card { position: relative; }
+.install-close { position: absolute; top: 0; right: 0; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); font-size: 24px; line-height: 1; }
+.install-close:hover, .install-close:focus-visible { background: var(--surface-soft); color: var(--ink); }
+@keyframes install-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .install-dialog[open] { animation: none; } }
+
 .topbar {
   position: sticky;
   z-index: 20;
@@ -173,6 +207,8 @@ button:disabled { cursor: not-allowed; }
 .booking-aside-rule { width: 48px; height: 1px; margin: 37px 0 16px; background: #c2a778; }
 .booking-aside > span { color: #d7d4cc; font-size: 12px; }
 .booking-card { padding: clamp(24px, 4vw, 38px); border: 1px solid #e5e3dd; border-radius: var(--radius-md); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
+.booking-unavailable { margin: 22px 0 0; padding: 18px 20px; border-left: 2px solid var(--accent); background: var(--surface-soft); color: var(--ink); font-size: 15px; line-height: 1.7; }
+.booking-unavailable a { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .booking-progress { display: flex; align-items: center; gap: 12px; color: var(--muted-light); font-size: 12px; font-variant-numeric: tabular-nums; }
 .booking-progress i { flex: 1; height: 1px; background: var(--line); }
 .booking-progress .progress-active { color: var(--accent); font-weight: 750; }
@@ -220,14 +256,39 @@ footer { display: flex; min-height: 86px; align-items: center; justify-content: 
 footer > a:last-of-type { color: var(--ink); }
 .haptics-toggle { padding: 8px 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; }
 .mobile-nav { display: none; }
+.mobile-home { display: none; }
 
 @media (max-width: 800px) {
   html { scroll-padding-top: 72px; }
-  body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
+  body { padding-bottom: calc(78px + env(safe-area-inset-bottom)); }
   .topbar { min-height: 66px; padding-inline: 22px; }
   .topbar nav { display: none; }
   .top-cta { min-height: 40px; padding-inline: 13px; font-size: 13px; }
-  .hero { grid-template-columns: 1fr; gap: 34px; min-height: 0; padding: 62px 24px 84px; }
+  .hero { display: none; }
+  .mobile-home { display: block; padding: 27px 20px 30px; }
+  .mobile-home-kicker { margin: 0 0 17px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+  .mobile-home-kicker span { color: var(--accent); padding-inline: 5px; }
+  .mobile-home h1 { max-width: 390px; margin: 0 0 22px; font-size: clamp(28px, 8vw, 36px); font-weight: 650; line-height: 1.12; letter-spacing: -.045em; }
+  .mobile-home h1 span { color: var(--muted); }
+  .mobile-shop-card { display: flex; align-items: center; gap: 15px; padding: 17px; border: 1px solid var(--line); border-radius: 18px; background: #fff; }
+  .mobile-shop-mark { display: grid; width: 48px; height: 48px; flex: 0 0 48px; place-items: center; border-radius: 15px; background: #181817; color: #f7f6f2; font-family: var(--font-editorial); font-size: 24px; }
+  .mobile-shop-card h2 { margin: 0 0 3px; font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
+  .mobile-shop-card p { margin: 0 0 5px; color: var(--ink-soft); font-size: 13px; }
+  .mobile-shop-card span { color: var(--muted); font-size: 11px; }
+  .mobile-book-cta { display: flex; width: 100%; min-height: 54px; justify-content: space-between; margin-top: 14px; padding-inline: 18px; border-radius: 14px; font-size: 15px; }
+  .mobile-book-status { margin: 14px 0 0; padding: 13px 14px; border-radius: 13px; background: var(--surface-soft); color: var(--ink-soft); font-size: 13px; }
+  .mobile-account-link { display: flex; min-height: 46px; align-items: center; justify-content: space-between; padding: 0 3px; color: var(--ink); font-size: 14px; font-weight: 600; }
+  .mobile-service-heading { display: flex; align-items: baseline; justify-content: space-between; margin: 19px 0 8px; }
+  .mobile-service-heading h2 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.025em; }
+  .mobile-service-heading a { color: var(--muted); font-size: 12px; }
+  .mobile-service-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .mobile-service { display: grid; min-height: 76px; align-content: center; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fff; color: var(--ink); text-align: left; }
+  button.mobile-service { cursor: pointer; }
+  .mobile-service strong { font-size: 13px; font-weight: 620; }
+  .mobile-service span { color: var(--muted); font-size: 11px; }
+  .mobile-service b { grid-column: 2; grid-row: 1 / span 2; align-self: center; justify-self: end; font-size: 13px; font-weight: 650; }
+  .mobile-service:active { transform: scale(.985); }
+  #salon, #prestations, #avis, .closing { display: none; }
   .hero h1 { font-size: clamp(54px, 12vw, 82px); }
   .hero-lede { max-width: 480px; margin-block: 20px 24px; font-size: 17px; }
   .hero-shop-card { width: min(100%, 500px); }
@@ -242,7 +303,15 @@ footer > a:last-of-type { color: var(--ink); }
   .service-duration { font-size: 12px; }
   .service-price { font-size: 14px; }
   .service-pick { width: 34px; height: 34px; }
-  .booking { grid-template-columns: 1fr; gap: 30px; padding: 68px 24px; }
+  .booking { grid-template-columns: 1fr; gap: 12px; padding: 28px 16px 34px; scroll-margin-top: 72px; }
+  .booking-aside { display: none; }
+  .booking-card { padding: 20px 16px; border-radius: 18px; }
+  .booking-step legend { font-size: 21px; }
+  .booking-step .step-hint { font-size: 13px; }
+  .booking-step input, .booking-step select { min-height: 48px; font-size: 16px; }
+  .slots { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .slot-button { min-height: 48px; }
+  .service-option { min-height: 58px; }
   .booking-aside { position: static; }
   .booking-aside h2 { margin-block: 18px; font-size: clamp(47px, 10vw, 64px); }
   .booking-aside-rule { margin-top: 25px; }
@@ -250,9 +319,13 @@ footer > a:last-of-type { color: var(--ink); }
   footer { flex-wrap: wrap; justify-content: flex-start; padding: 18px 24px; }
   footer > span { flex: 1 1 55%; order: 3; }
   .haptics-toggle { flex: 1 1 100%; text-align: left; }
-  .mobile-nav { position: fixed; z-index: 40; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); min-height: calc(64px + env(safe-area-inset-bottom)); align-items: center; padding: 5px 5px env(safe-area-inset-bottom); border-top: 1px solid var(--line); background: rgb(255 255 255 / 97%); }
-  .mobile-nav a { display: grid; min-height: 48px; place-items: center; padding: 4px; color: var(--muted); font-size: 11px; font-weight: 550; text-align: center; }
-  .mobile-nav a[href="#reserver"] { border-radius: var(--radius-sm); background: var(--ink); color: #fff; }
+  .mobile-nav { position: fixed; z-index: 40; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-height: calc(68px + env(safe-area-inset-bottom)); align-items: center; padding: 5px 9px env(safe-area-inset-bottom); border-top: 1px solid rgb(30 30 28 / 9%); background: rgb(255 255 255 / 96%); backdrop-filter: blur(18px); }
+  .mobile-nav a { display: grid; min-height: 52px; align-content: center; justify-items: center; gap: 3px; padding: 4px; border-radius: 12px; color: #777773; font-size: 11px; font-weight: 560; text-align: center; }
+  .mobile-nav a > span { font-size: 18px; line-height: 1; }
+  .mobile-nav a small { font-size: 10px; }
+  .mobile-nav a[aria-current="page"] { color: var(--ink); }
+  .mobile-nav a.nav-book { color: var(--ink); }
+  .mobile-nav a:active { background: var(--surface-soft); }
 }
 @media (max-width: 520px) {
   .brand { font-size: 13px; }
@@ -283,6 +356,7 @@ footer > a:last-of-type { color: var(--ink); }
   .slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   footer > span { flex-basis: 100%; }
 }
+@media (prefers-reduced-motion: reduce) { .mobile-service:active { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }

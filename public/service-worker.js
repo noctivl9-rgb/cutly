@@ -1,8 +1,9 @@
-const CACHE_NAME = 'cutly-public-shell-v1';
+const CACHE_NAME = 'cutly-public-shell-v3';
 const SHELL_FILES = [
   '/offline.html',
   '/install.html',
   '/install.css',
+  '/mobile-app.css',
   '/favicon.svg',
   '/icons/cutly-192.png',
   '/icons/cutly-512.png',

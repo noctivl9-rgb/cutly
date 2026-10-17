@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const { createDatabase } = require('./lib/database');
 const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessionFromRequest, cookieHeader, logout, mfaKey } = require('./lib/auth');
 const { createBooking } = require('./lib/booking');
+const { getDayAvailability, getMonthAvailability } = require('./lib/availability');
 const { registerClient, resendClientVerification, verifyEmail, requestPasswordReset, resetClientPassword } = require('./lib/accounts');
 const { emailConfigured, publicBaseUrl, sendVerificationEmail, providerStatus } = require('./lib/providers');
 const { transitionAppointment, modifyAppointment } = require('./lib/appointments');
@@ -24,7 +25,7 @@ function assertProductionConfiguration(){
  try{publicBaseUrl();}catch{throw new Error('Production requires a valid HTTPS CUTLY_PUBLIC_BASE_URL.');}
  if(!(process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or DATABASE_URL for PostgreSQL.');
 }
-if(process.env.NODE_ENV==='production')assertProductionConfiguration();
+if(process.env.NODE_ENV==='production'||process.env.NETLIFY==='true')assertProductionConfiguration();
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
@@ -234,38 +235,8 @@ async function initializePostgres(){
 }
 
 async function publicServices(){return (await db.prepare("SELECT id,name,price_cents AS priceCents,duration_minutes AS durationMinutes FROM services WHERE establishment_id=? AND active=1 ORDER BY CASE id WHEN 'degrade-classique' THEN 1 WHEN 'burst-fade' THEN 2 WHEN 'taper' THEN 3 WHEN 'coupe-classique' THEN 4 WHEN 'contours' THEN 5 ELSE 99 END,lower(name)").all(shop.id));}
-async function busySlots(...values){return (await db.prepare("SELECT starts_at AS startsAt, ends_at AS endsAt FROM appointments WHERE establishment_id=? AND status IN ('PENDING','CONFIRMED') AND starts_at < ? AND ends_at > ? UNION ALL SELECT starts_at AS startsAt, ends_at AS endsAt FROM unavailability WHERE establishment_id=? AND starts_at < ? AND ends_at > ?").all(...values));}
 async function findService(id,establishmentId){return (await db.prepare('SELECT * FROM services WHERE id=? AND establishment_id=? AND active=1').get(id,establishmentId));}
 const MIME = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml' };
-const parisParts = (date) => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).reduce((o,p)=>(o[p.type]=p.value,o),{});
-function parisToUTC(date, time) {
- const [year,month,day]=date.split('-').map(Number), [hour,minute]=time.split(':').map(Number);
- const target=Date.UTC(year,month-1,day,hour,minute);
- let guess=target;
- for(let i=0;i<3;i++){const p=parisParts(new Date(guess));const represented=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute);guess+=target-represented;}
- const out=new Date(guess); const p=parisParts(out);
- if(+p.year!==year||+p.month!==month||+p.day!==day||+p.hour!==hour||+p.minute!==minute) return null;
- return out;
-}
-async function available(date, service) {
- if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
- const [dateYear,dateMonth,dateDay]=date.split('-').map(Number);
- const parsedDate=new Date(Date.UTC(dateYear,dateMonth-1,dateDay));
- if(parsedDate.getUTCFullYear()!==dateYear||parsedDate.getUTCMonth()!==dateMonth-1||parsedDate.getUTCDate()!==dateDay) return [];
- const day=new Date(`${date}T12:00:00Z`).getUTCDay();
- const hours=await db.prepare('SELECT opens,closes FROM opening_hours WHERE establishment_id=? AND weekday=?').get(shop.id,day);
- if(!hours?.opens||!hours.closes)return [];
- const [openHour,openMinute]=hours.opens.split(':').map(Number),[closeHour,closeMinute]=hours.closes.split(':').map(Number),openAt=openHour*60+openMinute,closeAt=closeHour*60+closeMinute;
- const result=[];
- for(let mins=openAt; mins<closeAt; mins+=15){
-  if(mins+service.duration_minutes>closeAt) continue;
-  const hh=String(Math.floor(mins/60)).padStart(2,'0'), mm=String(mins%60).padStart(2,'0');
-  const start=parisToUTC(date,`${hh}:${mm}`); if(!start||start.getTime()<=Date.now()) continue;
-  const end=new Date(start.getTime()+service.duration_minutes*60000);
-  if((await busySlots(shop.id,end.toISOString(),start.toISOString(),shop.id,end.toISOString(),start.toISOString())).length===0) result.push(`${hh}:${mm}`);
- }
- return result;
-}
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin','x-frame-options':'DENY','permissions-policy':'camera=(), microphone=(), geolocation=()','content-security-policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"};
 function json(res,status,payload,extra={}) { res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...SECURITY_HEADERS,...extra});res.end(JSON.stringify(payload)); }
 function readBody(req){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>16_384){reject(new Error('body_too_large'));req.destroy();}});req.on('end',()=>{try{resolve(JSON.parse(raw||'{}'));}catch{reject(new Error('invalid_json'));}});req.on('error',reject);});}
@@ -276,6 +247,7 @@ function allowPublicAttempt(key,limit=5,windowMs=15*60*1000){return consumeAttem
 function checkSameOrigin(req){const origin=req.headers.origin;if(!origin)return process.env.NODE_ENV!=='production';try{return new URL(origin).host===req.headers.host;}catch{return false;}}
 function sessionFor(req){return sessionFromRequest(db,req);}
 function adminFailure(res,error){return json(res,error.status||500,{error:error.code||'request_failed'});}
+const CLIENT_APPOINTMENT_FIELDS=`id,service_name_snapshot AS serviceName,price_cents_snapshot AS priceCents,duration_minutes_snapshot AS durationMinutes,starts_at AS startsAt,ends_at AS endsAt,timezone,status,payment_status AS paymentStatus,reward_id AS rewardId,version,created_at AS createdAt,(SELECT status FROM reviews WHERE appointment_id=appointments.id) AS reviewStatus,(SELECT status FROM cancellation_requests WHERE appointment_id=appointments.id ORDER BY created_at DESC,id DESC LIMIT 1) AS cancellationStatus`;
 const server=http.createServer(async(req,res)=>{
  try {
   const url=new URL(req.url,'http://localhost');
@@ -368,7 +340,13 @@ const server=http.createServer(async(req,res)=>{
   }
   if(req.method==='GET'&&url.pathname==='/api/client/appointments'){
    const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||50)),offset=Math.min(10000,Math.max(0,Number(url.searchParams.get('offset'))||0));
-   const rows=(await db.prepare(`SELECT id,service_name_snapshot AS serviceName,price_cents_snapshot AS priceCents,duration_minutes_snapshot AS durationMinutes,starts_at AS startsAt,ends_at AS endsAt,timezone,status,payment_status AS paymentStatus,reward_id AS rewardId,version,created_at AS createdAt,(SELECT status FROM reviews WHERE appointment_id=appointments.id) AS reviewStatus FROM appointments WHERE client_user_id=? ORDER BY starts_at DESC LIMIT ? OFFSET ?`).all(session.user_id,limit,offset));return json(res,200,{appointments:rows,limit,offset});
+   const rows=(await db.prepare(`SELECT ${CLIENT_APPOINTMENT_FIELDS} FROM appointments WHERE client_user_id=? ORDER BY starts_at DESC LIMIT ? OFFSET ?`).all(session.user_id,limit,offset));return json(res,200,{appointments:rows,limit,offset});
+  }
+  const clientAppointmentRoute=url.pathname.match(/^\/api\/client\/appointments\/([^/]+)$/);
+  if(req.method==='GET'&&clientAppointmentRoute){
+   const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});
+   const appointment=await db.prepare(`SELECT ${CLIENT_APPOINTMENT_FIELDS} FROM appointments WHERE id=? AND client_user_id=?`).get(clientAppointmentRoute[1],session.user_id);
+   return appointment?json(res,200,{appointment}):json(res,404,{error:'appointment_not_found'});
   }
   if(req.method==='GET'&&url.pathname==='/api/client/loyalty'){
    const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});
@@ -478,15 +456,19 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&url.pathname==='/api/reviews')return json(res,200,{reviews:(await db.prepare("SELECT r.rating,r.comment,r.created_at AS createdAt FROM reviews r JOIN appointments a ON a.id=r.appointment_id WHERE r.status='PUBLISHED' AND a.establishment_id='thomas-shop' ORDER BY r.created_at DESC LIMIT 30").all())});
   if(req.method==='GET'&&url.pathname==='/api/shop') return json(res,200,{...shop,timezone:'Europe/Paris',hours:(await db.prepare("SELECT weekday,opens AS open,closes AS close FROM opening_hours WHERE establishment_id='thomas-shop' ORDER BY weekday").all()).map(item=>({...item,day:new Intl.DateTimeFormat('fr-FR',{weekday:'long',timeZone:'Europe/Paris'}).format(new Date(Date.UTC(2026,0,4+item.weekday,12)))})),services:await publicServices()});
   if(req.method==='GET'&&url.pathname==='/api/status'){const providers=providerStatus();let baseConfigured=false;try{publicBaseUrl();baseConfigured=true;}catch{}const adminReady=Boolean((await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get()));const blockers=[];if(providers.email!=='CONFIGURED')blockers.push('EMAIL_PROVIDER_NOT_CONFIGURED');if(!baseConfigured)blockers.push('PUBLIC_HTTPS_URL_NOT_CONFIGURED');if(!mfaKey())blockers.push('MFA_ENCRYPTION_KEY_NOT_CONFIGURED');if(!adminReady)blockers.push('ADMIN_NOT_INITIALIZED');return json(res,200,{booking:blockers.length?'BLOCKED':'READY',blockers,emailProvider:providers.email,verificationMode:'EMAIL_ONLY_PHONE_CONTACT',smsAppointmentNotifications:'DISABLED',publicBaseUrl:baseConfigured?'CONFIGURED':'NOT_CONFIGURED',adminMfa:mfaKey()?'CONFIGURED':'NOT_CONFIGURED',admin:adminReady?'INITIALIZED':'NOT_INITIALIZED',database:db.kind});}
+  if(req.method==='GET'&&url.pathname==='/api/availability/month'){
+   const service=await findService(url.searchParams.get('service'),shop.id);if(!service)return json(res,404,{error:'service_not_found'});
+   try{return json(res,200,await getMonthAvailability(db,{month:url.searchParams.get('month'),service}));}catch(error){return adminFailure(res,error);}
+  }
   if(req.method==='GET'&&url.pathname==='/api/availability'){
    const service=await findService(url.searchParams.get('service'),shop.id); if(!service)return json(res,404,{error:'service_not_found'});
-   return json(res,200,{date:url.searchParams.get('date'),timezone:'Europe/Paris',slots:await available(url.searchParams.get('date'),service)});
+   return json(res,200,await getDayAvailability(db,{date:url.searchParams.get('date'),service}));
   }
   if(req.method==='POST'&&url.pathname==='/api/bookings'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const session=await sessionFor(req);if(!session||session.role!=='CLIENT')return json(res,401,{error:'authentication_required'});
    const body=await readBody(req);
    if(typeof body.serviceId!=='string'||typeof body.date!=='string'||typeof body.time!=='string'||typeof body.idempotencyKey!=='string')return json(res,400,{error:'invalid_booking_request'});
-   try{const booking=await createBooking(db,{userId:session.user_id,serviceId:body.serviceId,date:body.date,time:body.time,idempotencyKey:body.idempotencyKey,rewardId:body.rewardId||null});return json(res,201,{booking,message:'Votre demande de réservation a bien été envoyée. Elle sera confirmée après validation par Thomas.'});}catch(error){if(error.code==='slot_unavailable')return json(res,409,{error:error.code,message:'Ce créneau vient d’être réservé. Merci de sélectionner un autre horaire.'});return adminFailure(res,error);}
+   try{const booking=await createBooking(db,{userId:session.user_id,serviceId:body.serviceId,date:body.date,time:body.time,idempotencyKey:body.idempotencyKey,rewardId:body.rewardId||null,expectedPriceCents:body.expectedPriceCents,expectedDurationMinutes:body.expectedDurationMinutes});return json(res,201,{booking,message:'Votre demande de réservation a bien été envoyée. Elle sera confirmée après validation par Thomas.'});}catch(error){if(error.code==='slot_unavailable')return json(res,409,{error:error.code,message:'Ce créneau vient d’être réservé. Merci de sélectionner un autre horaire.'});return adminFailure(res,error);}
   }
   if(req.method==='GET'&&url.pathname.startsWith('/api/')) return json(res,404,{error:'not_found'});
   const target=url.pathname==='/'?'/index.html':url.pathname;

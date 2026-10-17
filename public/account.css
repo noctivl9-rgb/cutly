@@ -1,40 +1,68 @@
-.account-shell { width: min(100% - 40px, 1040px); margin: 0 auto; padding: 30px 0 80px; }
-.account-header { display: flex; min-height: 54px; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 56px; padding-bottom: 19px; border-bottom: 1px solid var(--line); }
-.account-header a { color: var(--ink); }
-.account-shell > section { max-width: 760px; }
-.account-shell h1 { margin: 0 0 10px; font-size: clamp(35px, 5vw, 54px); font-weight: 580; line-height: 1.06; letter-spacing: -.06em; }
-.account-shell h2 { margin: 0 0 18px; font-size: 23px; font-weight: 620; letter-spacing: -.035em; }
-.account-shell h3 { margin: 20px 0 0; font-size: 16px; font-weight: 620; }
-.muted { color: var(--muted); }
-.account-note { max-width: 560px; margin: 18px 0 25px; color: var(--muted); font-size: 15px; }
-.account-shell > section > .muted { max-width: 600px; margin: 0 0 27px; font-size: 16px; }
-.account-shell .admin-form { max-width: 520px; }
-.account-shell .admin-form button { justify-self: start; }
-.account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 30px 0; }
-.account-grid > *, .account-shell > section > .admin-settings { min-width: 0; }
-.account-verification { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.65; }
-.account-items { display: grid; gap: 0; }
-.account-item { padding: 14px 0; border-bottom: 1px solid var(--line); }
-.account-item strong, .account-item span { display: block; }
-.account-item strong { font-size: 15px; font-weight: 600; }
-.account-item span { margin-top: 5px; color: var(--muted); font-size: 13px; }
-.account-appointments { margin-top: 20px; }
-.account-details { margin-top: 13px; padding: 17px 19px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
-.account-details summary { cursor: pointer; font-size: 15px; font-weight: 620; }
-.account-details[open] summary { margin-bottom: 21px; }
-.account-details .admin-form { margin-top: 18px; }
-.account-details[open] .admin-form:first-of-type { margin-top: 0; }
-.account-password-form { margin-top: 25px; padding-top: 22px; border-top: 1px solid var(--line); }
-.button-link { display: inline-flex; min-height: 44px; align-items: center; padding: 0 15px; border-radius: var(--radius-sm); background: var(--ink); color: #fff; font-size: 14px; font-weight: 600; }
-.account-shell .admin-settings { margin-top: 18px; }
-.account-shell [data-toggle-haptics] { min-height: 42px; padding: 0 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
-.legal-content { max-width: 760px; }
-.legal-content h1 { margin-bottom: 24px; }
-.legal-content h2 { margin: 32px 0 8px; font-size: 20px; }
-.legal-content p { color: var(--muted); font-size: 15px; line-height: 1.75; }
-.legal-content strong { color: var(--ink-soft); }
-@media (max-width: 680px) {
-  .account-shell { width: min(100% - 32px, 600px); padding-top: 20px; }
-  .account-header { margin-bottom: 38px; }
-  .account-grid { grid-template-columns: 1fr; gap: 13px; }
-}
+/* CUTLY — espace client. Utilise les jetons de mobile-app.css. */
+.client-content{max-width:680px;margin-inline:auto}
+.client-content>div>.page-title,.client-content>.page-title,#identity-page>.page-title{margin-bottom:var(--s2)}
+.client-content #client-page-content>.muted,#identity-page>.muted{margin-bottom:var(--s5)}
+.client-content #client-page-content>a:first-child{display:inline-flex;align-items:center;min-height:44px;margin:0 0 var(--s1) -2px;text-decoration:none;font-size:15px;font-weight:550;color:var(--ink-2)}
+
+/* Formulaires */
+.client-form{display:grid;gap:var(--s4)}
+.client-form label{display:grid;gap:7px;font-size:15px;font-weight:600}
+.client-form input,.client-form select,.client-form textarea{width:100%;min-height:50px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink);font:inherit;font-size:16px;font-weight:400}
+.client-form textarea{resize:vertical}
+.client-form .check{display:flex;gap:12px;align-items:flex-start;font-weight:400;font-size:15px}
+.client-form .check input{width:22px;min-height:22px;height:22px;flex-shrink:0;margin-top:1px}
+.client-form .button{width:100%}
+.client-links{display:flex;flex-wrap:wrap;gap:4px 20px;margin-top:var(--s5)}
+.client-links a,.client-form a{text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
+.client-content section[data-auth-panel]{margin-top:var(--s5);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--shadow-1)}
+.client-content section[data-auth-panel]>p:first-child{color:var(--muted);margin-bottom:var(--s4);font-size:15px}
+
+/* Onglets segmentés */
+.client-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:var(--s4) 0 var(--s5);padding:4px;background:var(--paper-2);border-radius:var(--r-md)}
+.client-tabs a{min-height:40px;display:flex;align-items:center;justify-content:center;padding:6px 8px;border-radius:11px;color:var(--ink-2);text-decoration:none;font-size:14.5px;font-weight:600;transition:background var(--fast),color var(--fast)}
+.client-tabs a[aria-current=page]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(22 21 15/.12)}
+
+/* Cartes de rendez-vous */
+.appointment-link{display:flex;gap:var(--s4);align-items:flex-start;color:inherit;text-decoration:none;padding:var(--s4);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-1);transition:border-color var(--fast),transform var(--fast) var(--ease);animation:rise .3s var(--ease) both}
+.appointment-link:hover{border-color:var(--line-strong)}
+.appointment-link:active{transform:scale(.985)}
+.date-tile{display:grid;justify-items:center;align-content:center;width:58px;min-height:66px;flex-shrink:0;border-radius:var(--r-md);background:var(--ink);color:var(--paper);padding:6px 0;text-transform:uppercase;font-size:10.5px;font-weight:650;letter-spacing:.08em;line-height:1.2}
+.date-tile strong{font-size:23px;letter-spacing:-.02em;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}
+.date-tile span:last-child{color:#e0a07f}
+.appointment-body{display:grid;gap:3px;min-width:0;flex:1}
+.appointment-body strong{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.appointment-when{font-size:15px}
+.appointment-body .muted{font-size:14px}
+.appointment-body .client-status{margin-top:6px}
+
+/* Détail */
+.client-details{display:grid;margin:0}
+.client-details div{display:grid;grid-template-columns:1fr 1.5fr;gap:var(--s4);padding:12px 0;border-bottom:1px solid var(--line)}
+.client-details div:last-child{border-bottom:0}
+.client-details dt{color:var(--muted);font-size:15px}
+.client-details dd{margin:0;text-align:right;font-weight:600;overflow-wrap:anywhere}
+
+/* Menus et listes */
+.client-menu{display:grid;margin-top:var(--s5);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:0 var(--s4);box-shadow:var(--shadow-1)}
+.client-menu a{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:54px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;font-weight:550}
+.client-menu a:last-child{border-bottom:0}
+.client-menu a::after{content:"";width:8px;height:8px;border-right:1.7px solid var(--muted);border-top:1.7px solid var(--muted);transform:rotate(45deg)}
+.client-ledger{list-style:none;padding:0;margin:0}
+.client-ledger li{padding:14px 0;border-bottom:1px solid var(--line)}
+.client-ledger li:last-child{border-bottom:0}
+.client-ledger p{margin:4px 0 0}
+#account-rewards .list-row .button{width:auto;min-height:44px;font-size:14.5px}
+
+.client-message{min-height:1.5em;color:var(--ink-2);overflow-wrap:anywhere;font-size:15px}
+.client-message:empty{min-height:0}
+.client-loading{color:var(--muted);display:flex;align-items:center;gap:10px;padding:var(--s4) 0}
+.client-loading::before{content:"";width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--ink);animation:spin .8s linear infinite}
+#client-error{display:grid;gap:var(--s3)}
+#client-error a{font-weight:600}
+.client-content h2{font-size:20px;line-height:1.3;margin:0 0 var(--s3)}
+.client-content .panel{margin-top:var(--s4)}
+.client-content section+section{margin-top:var(--s5)}
+.client-content [hidden]{display:none!important}
+#load-more{width:100%}
+.profile-form-title{margin-top:var(--s6)!important}
+@media(max-width:340px){.client-details div{grid-template-columns:1fr;gap:4px}.client-details dd{text-align:left}.date-tile{width:52px}}

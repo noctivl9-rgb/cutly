@@ -10,6 +10,22 @@
   };
 
   window.CutlyFeedback = feedback;
+  const updateNavigation = () => {
+    const currentLocation = window.location || (typeof location !== 'undefined' ? location : null);
+    if (!currentLocation) return;
+    const accountPage = currentLocation.pathname.endsWith('/account.html');
+    for (const link of document.querySelectorAll('.mobile-nav a')) {
+      const href = link.getAttribute('href') || '';
+      const active = accountPage
+          ? (href.includes('#appointments') ? currentLocation.hash === '#appointments' : href.includes('#account-dashboard') ? currentLocation.hash !== '#appointments' : false)
+        : (href === '#reserver' ? currentLocation.hash === '#reserver' : href === '#accueil' && !currentLocation.hash);
+      if (active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    }
+  };
+  updateNavigation();
+  window.addEventListener?.('hashchange', updateNavigation);
+  window.addEventListener?.('popstate', updateNavigation);
   for (const control of document.querySelectorAll('[data-toggle-haptics]')) {
     if (!canVibrate) {
       control.hidden = true;

@@ -10,3 +10,6 @@ backups/
 *.sqlite-wal
 *.sqlite-shm
 .neon
+
+# Local Netlify folder
+.netlify

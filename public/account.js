@@ -1,19 +1,112 @@
-const $=selector=>document.querySelector(selector);let currentProfile=null;
-async function accountApi(url,options={}){const response=await fetch(url,{credentials:'same-origin',...options,headers:{...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(data.error||'request_failed');error.payload=data;throw error;}return data;}
-function revealAccount(){ $('#account-login').hidden=true;$('#account-dashboard').hidden=false;$('#account-logout').hidden=false; }
-async function loadProfile(){currentProfile=await accountApi('/api/client/profile');$('#account-name').textContent=currentProfile.firstName;$('#account-email').textContent=currentProfile.email;const form=$('#profile-form');form.elements.firstName.value=currentProfile.firstName;form.elements.lastName.value=currentProfile.lastName;form.elements.phone.value=currentProfile.phone||'';form.elements.language.value=currentProfile.language;$('#verification-state').textContent=`E-mail : ${currentProfile.emailVerifiedAt?'vérifié':'à vérifier'} · Téléphone de contact : ${currentProfile.phone||'à renseigner'}`;}
-async function loadAppointments(){const result=await accountApi('/api/client/appointments'),list=$('#account-appointments');list.replaceChildren();if(!result.appointments.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Aucun rendez-vous pour le moment.';list.append(empty);return;}for(const item of result.appointments){const card=document.createElement('article');card.className='appointment';const info=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('p'),status=document.createElement('p');title.textContent=item.serviceName;meta.textContent=`${new Date(item.startsAt).toLocaleString(currentProfile.language==='en'?'en-GB':'fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})} · ${item.durationMinutes} min · ${(item.priceCents/100).toLocaleString(currentProfile.language==='en'?'en-GB':'fr-FR',{style:'currency',currency:'EUR'})}`;status.textContent=`${item.status} · paiement ${item.paymentStatus}`;info.append(title,meta,status);if(item.status==='PENDING'||item.status==='CONFIRMED'){const cancel=document.createElement('button');cancel.className='secondary';cancel.textContent='Demander l’annulation';cancel.addEventListener('click',async()=>{if(!window.confirm('Envoyer votre demande d’annulation ?'))return;try{const result=await accountApi(`/api/client/appointments/${encodeURIComponent(item.id)}/cancellation`,{method:'POST',body:JSON.stringify({})});$('#appointment-message').textContent=result.type==='CANCELLED'?'Le rendez-vous a été annulé.': 'Votre demande est envoyée. Le créneau reste réservé jusqu’à la réponse de Thomas.';await loadAppointments();}catch(error){$('#appointment-message').textContent='Demande impossible : '+error.message;}});card.append(info,cancel);}else card.append(info);if(item.status==='COMPLETED'&&!item.reviewStatus){const review=document.createElement('button');review.className='secondary';review.textContent='Deposer un avis';review.addEventListener('click',async()=>{const rating=Number(window.prompt('Note de 1 a 5'));if(!Number.isInteger(rating)||rating<1||rating>5)return;const comment=window.prompt('Commentaire facultatif')||'';try{await accountApi('/api/client/reviews',{method:'POST',body:JSON.stringify({appointmentId:item.id,rating,comment})});$('#appointment-message').textContent='Avis envoye a Thomas pour validation avant publication.';await loadAppointments();}catch(error){$('#appointment-message').textContent='Avis non envoye : '+error.message;}});card.append(review);}else if(item.reviewStatus){const reviewState=document.createElement('p');reviewState.textContent=item.reviewStatus==='PENDING_MODERATION'?'Avis en attente de validation':item.reviewStatus==='PUBLISHED'?'Avis publie':'Avis masque';card.append(reviewState);}list.append(card);}}
-async function loadLoyalty(){const data=await accountApi('/api/client/loyalty'),rewards=$('#account-rewards'),ledger=$('#loyalty-ledger');rewards.replaceChildren();ledger.replaceChildren();if(!data.rewards.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Aucune récompense disponible.';rewards.append(empty);}for(const reward of data.rewards){const row=document.createElement('div');row.className='account-item';const title=document.createElement('strong'),detail=document.createElement('span');title.textContent=`Coupe classique offerte · cycle ${reward.cycleNumber}`;detail.textContent=`${reward.status} · obtenue le ${new Date(reward.earnedAt).toLocaleDateString('fr-FR')}`;row.append(title,detail);rewards.append(row);}if(!data.ledger.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='Aucun mouvement pour le moment.';ledger.append(empty);}for(const entry of data.ledger){const row=document.createElement('div');row.className='account-item';const title=document.createElement('strong'),detail=document.createElement('span');title.textContent=`${entry.points>0?'+':''}${entry.points} · ${entry.kind}`;detail.textContent=new Date(entry.createdAt).toLocaleDateString('fr-FR');row.append(title,detail);ledger.append(row);}}
-async function loadAccount(){revealAccount();await Promise.all([loadProfile(),loadAppointments(),loadLoyalty()]);}
-$('#account-login-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.currentTarget),message=$('#account-login-message');message.textContent='';try{await accountApi('/api/auth/client/login',{method:'POST',body:JSON.stringify({email:form.get('email'),password:form.get('password')})});await loadAccount();}catch{message.textContent='Connexion impossible. Vérifiez vos identifiants.';}});
-$('#profile-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;try{const result=await accountApi('/api/client/profile',{method:'PATCH',body:JSON.stringify({version:currentProfile.version,firstName:form.elements.firstName.value,lastName:form.elements.lastName.value,language:form.elements.language.value,phone:form.elements.phone.value})});currentProfile.version=result.version;currentProfile.firstName=form.elements.firstName.value;currentProfile.lastName=form.elements.lastName.value;currentProfile.phone=form.elements.phone.value;currentProfile.language=form.elements.language.value;$('#account-name').textContent=currentProfile.firstName;$('#verification-state').textContent=`E-mail : ${currentProfile.emailVerifiedAt?'vérifié':'à vérifier'} · Téléphone de contact : ${currentProfile.phone||'à renseigner'}`;$('#profile-message').textContent='Profil enregistré.';}catch(error){$('#profile-message').textContent=error.message==='version_conflict'?'Le profil a changé ailleurs. Rechargez la page.':'Modification impossible : '+error.message;}});
-$('#password-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,message=$('#password-message');try{await accountApi('/api/client/password',{method:'POST',body:JSON.stringify({currentPassword:form.elements.currentPassword.value,newPassword:form.elements.newPassword.value})});message.textContent='Mot de passe modifié. Reconnectez-vous.';form.reset();setTimeout(()=>location.reload(),1200);}catch(error){message.textContent=error.message==='invalid_credentials'?'Mot de passe actuel incorrect.':'Modification impossible : '+error.message;}});
-$('#account-logout').addEventListener('click',async()=>{try{await accountApi('/api/auth/logout',{method:'POST'});}finally{location.reload();}});
-accountApi('/api/auth/session').then(session=>{if(session.user.role==='CLIENT')return loadAccount();}).catch(()=>{});
-$('#register-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,data=new FormData(form),message=$('#register-message');message.textContent='';try{const result=await accountApi('/api/auth/client/register',{method:'POST',body:JSON.stringify({firstName:data.get('firstName'),lastName:data.get('lastName'),email:data.get('email'),phone:data.get('phone'),password:data.get('password')})});message.textContent=`Compte créé pour ${result.email}. Vérifiez votre e-mail pour pouvoir réserver.`;await loadAccount();}catch(error){const labels={email_provider_not_configured:'Aucun e-mail ne peut être envoyé actuellement.',public_base_url_not_configured:'L’adresse publique de CUTLY doit être configurée avant l’inscription.',account_already_exists:'Un compte existe déjà pour cet e-mail. Connectez-vous ou demandez un renvoi des vérifications.',phone_already_in_use:'Ce numéro est déjà associé à un compte.',too_many_attempts:'Trop de tentatives. Réessayez plus tard.'};message.textContent=labels[error.message]||`Inscription impossible : ${error.message}`;}});
-$('#resend-form').addEventListener('submit',async event=>{event.preventDefault();const email=new FormData(event.currentTarget).get('email'),message=$('#resend-message');try{await accountApi('/api/auth/client/resend-verification',{method:'POST',body:JSON.stringify({email})});message.textContent='Si un compte non vérifié correspond à cette adresse, un nouveau lien de vérification va être envoyé.';}catch(error){message.textContent=error.message==='email_provider_not_configured'?'L’envoi des e-mails n’est pas configuré.':'Demande impossible : '+error.message;}});
-$('#reset-request-form').addEventListener('submit',async event=>{event.preventDefault();const email=new FormData(event.currentTarget).get('email');try{await accountApi('/api/auth/client/password-reset',{method:'POST',body:JSON.stringify({email})});$('#reset-request-message').textContent='Si un compte correspond à cette adresse, un lien de réinitialisation lui sera envoyé.';}catch(error){$('#reset-request-message').textContent=error.message==='email_provider_not_configured'?'La récupération par e-mail n’est pas configurée.':'Demande impossible. Réessayez plus tard.';}});
-$('#reset-confirm-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;try{await accountApi('/api/auth/client/password-reset/confirm',{method:'POST',body:JSON.stringify({token:new URLSearchParams(location.search).get('resetPassword'),newPassword:form.elements.password.value})});$('#reset-confirm-message').textContent='Mot de passe réinitialisé. Vous pouvez vous connecter.';history.replaceState({},'',location.pathname);setTimeout(()=>location.reload(),1000);}catch(error){$('#reset-confirm-message').textContent='Le lien est invalide ou expiré. Demandez-en un nouveau.';}});
-const query=new URLSearchParams(location.search),emailToken=query.get('verifyEmail'),resetToken=query.get('resetPassword');
-if(resetToken){$('#account-login').hidden=true;$('#account-reset').hidden=false;}
-if(emailToken){accountApi('/api/auth/client/verify-email',{method:'POST',body:JSON.stringify({token:emailToken})}).then(async()=>{$('#verify-email-message').textContent='Adresse e-mail vérifiée. Vous pouvez maintenant réserver.';history.replaceState({},'',location.pathname);try{const session=await accountApi('/api/auth/session');if(session.user.role==='CLIENT')await loadAccount();}catch{}}).catch(()=>{$('#verify-email-message').textContent='Lien de vérification invalide ou expiré. Demandez un nouveau lien.';history.replaceState({},'',location.pathname);});}
+/* Shared authenticated requests. Tokens stay in HttpOnly cookies. */
+(() => {
+  const allowedReturns = new Set(['recap.html', 'appointments.html', 'appointment.html', 'history.html', 'loyalty.html', 'profile.html', 'settings.html', 'booking.html']);
+  function safeReturn(value) {
+    try {
+      const url = new URL(value || '/profile.html', location.origin);
+      if (url.origin !== location.origin || !allowedReturns.has(url.pathname.slice(1))) return '/profile.html';
+      return url.pathname + url.search;
+    } catch { return '/profile.html'; }
+  }
+  async function api(url, options = {}) {
+    let response;
+    try { response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options, headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...options.headers } }); }
+    catch { throw new Error('network_unavailable'); }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) { const error = new Error(data.error || 'request_failed'); error.status = response.status; throw error; }
+    return data;
+  }
+  const labels = {
+    authentication_required: 'Votre session a expiré. Reconnectez-vous pour continuer.',
+    network_unavailable: 'Connexion interrompue. Vérifiez votre réseau puis réessayez.',
+    invalid_credentials: 'E-mail ou mot de passe incorrect.',
+    email_provider_not_configured: 'L’envoi des e-mails est indisponible. Réessayez plus tard.',
+    public_base_url_not_configured: 'L’inscription n’est pas encore disponible.',
+    administrator_not_initialized: 'L’inscription n’est pas encore disponible.',
+    verification_secret_not_configured: 'La vérification est temporairement indisponible.',
+    account_already_exists: 'Un compte utilise déjà cet e-mail. Connectez-vous ou réinitialisez votre mot de passe.',
+    phone_already_in_use: 'Ce numéro est déjà associé à un compte.',
+    invalid_phone_e164: 'Utilisez le format international, par exemple +33612345678.',
+    too_many_attempts: 'Trop de tentatives. Patientez avant de réessayer.',
+    version_conflict: 'Ces informations ont changé ailleurs. Rechargez la page avant de réessayer.',
+    invalid_or_expired_token: 'Ce lien est invalide ou expiré. Demandez un nouveau lien.',
+    appointment_not_cancellable: 'Ce rendez-vous ne peut plus être annulé.',
+    review_already_exists: 'Un avis a déjà été déposé pour ce rendez-vous.',
+    invalid_new_password: 'Choisissez un mot de passe d’au moins 12 caractères.'
+  };
+  const message = error => labels[error.message] || 'Cette action n’a pas abouti. Réessayez ou contactez Thomas.';
+  async function submit(form, action, output) {
+    if (form.dataset.busy) return;
+    form.dataset.busy = 'true';
+    const buttons = [...form.querySelectorAll('button[type="submit"]')];
+    buttons.forEach(button => { button.disabled = true; });
+    output.textContent = 'En cours…';
+    try { await action(); } catch (error) { output.textContent = message(error); }
+    finally { delete form.dataset.busy; buttons.forEach(button => { button.disabled = false; }); }
+  }
+  window.CutlyAccount = { api, safeReturn, message, submit };
+  if (!document.querySelector('#identity-page')) return;
+  const query = new URLSearchParams(location.search);
+  if (location.hash === '#appointments') { location.replace('/appointments.html'); return; }
+  if (location.hash === '#account-dashboard') { location.replace('/profile.html'); return; }
+  let returnTo = safeReturn(query.get('return'));
+  try {
+    if (query.has('return')) sessionStorage.setItem('cutly-account-return', returnTo);
+    else returnTo = safeReturn(sessionStorage.getItem('cutly-account-return'));
+  } catch {}
+  const mode = query.has('resetPassword') ? 'reset' : query.has('verifyEmail') ? 'verify' : ['register', 'forgot', 'verify'].includes(query.get('mode')) ? query.get('mode') : 'login';
+  document.querySelectorAll('[data-auth-panel]').forEach(panel => { panel.hidden = panel.dataset.authPanel !== mode; });
+  const titles = { login: 'Ravi de vous retrouver', register: 'Créer mon compte', forgot: 'Retrouver mon compte', reset: 'Nouveau mot de passe', verify: 'Vérifier mon e-mail' };
+  document.querySelector('h1').textContent = titles[mode];
+  for (const link of document.querySelectorAll('[data-auth-mode]')) link.href = `/account.html?mode=${link.dataset.authMode}&return=${encodeURIComponent(returnTo)}`;
+  const goNext = async () => {
+    const profile = await api('/api/client/profile');
+    if (!profile.emailVerifiedAt) location.assign(`/account.html?mode=verify&return=${encodeURIComponent(returnTo)}`);
+    else location.assign(returnTo);
+  };
+  const bind = (id, action) => {
+    const form = document.getElementById(id);
+    form.addEventListener('submit', event => { event.preventDefault(); submit(form, () => action(Object.fromEntries(new FormData(form))), form.querySelector('[role="status"]')); });
+  };
+  bind('account-login-form', async data => { await api('/api/auth/client/login', { method: 'POST', body: JSON.stringify(data) }); await goNext(); });
+  bind('register-form', async data => { await api('/api/auth/client/register', { method: 'POST', body: JSON.stringify(data) }); await goNext(); });
+  bind('resend-form', async data => {
+    await api('/api/auth/client/resend-verification', { method: 'POST', body: JSON.stringify(data) });
+    document.querySelector('#resend-message').textContent = 'Si cette adresse correspond à un compte à vérifier, une demande d’envoi a été acceptée. Consultez votre boîte de réception et vos indésirables.';
+  });
+  bind('reset-request-form', async data => {
+    await api('/api/auth/client/password-reset', { method: 'POST', body: JSON.stringify(data) });
+    document.querySelector('#reset-request-message').textContent = 'Si cette adresse correspond à un compte, une demande de récupération a été acceptée. Consultez votre boîte de réception.';
+  });
+  bind('reset-confirm-form', async data => {
+    await api('/api/auth/client/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token: query.get('resetPassword'), newPassword: data.password }) });
+    history.replaceState({}, '', '/account.html');
+    document.querySelector('#reset-confirm-message').textContent = 'Mot de passe mis à jour. Vous pouvez vous connecter.';
+    document.querySelector('#reset-login').hidden = false;
+  });
+  document.querySelector('#verification-check').addEventListener('click', async event => {
+    event.currentTarget.disabled = true;
+    const output = document.querySelector('#verify-email-message');
+    try {
+      const profile = await api('/api/client/profile');
+      if (profile.emailVerifiedAt) location.assign(returnTo);
+      else output.textContent = 'Votre adresse n’est pas encore vérifiée. Ouvrez le lien reçu par e-mail, puis revenez ici.';
+    } catch (error) { output.textContent = message(error); }
+    finally { event.currentTarget.disabled = false; }
+  });
+  if (query.has('verifyEmail')) {
+    const token = query.get('verifyEmail');
+    history.replaceState({}, '', `/account.html?mode=verify&return=${encodeURIComponent(returnTo)}`);
+    api('/api/auth/client/verify-email', { method: 'POST', body: JSON.stringify({ token }) }).then(async () => {
+      document.querySelector('#verify-email-message').textContent = 'Adresse e-mail vérifiée. Vous pouvez continuer votre réservation.';
+      try { await goNext(); } catch { document.querySelector('#verified-login').hidden = false; }
+    }).catch(error => { document.querySelector('#verify-email-message').textContent = message(error); });
+  } else if (mode === 'login') {
+    api('/api/client/profile').then(profile => {
+      const existing = document.querySelector('#existing-session');
+      existing.hidden = false;
+      existing.querySelector('a').href = returnTo;
+      existing.querySelector('span').textContent = `Vous êtes connecté avec ${profile.email}.`;
+    }).catch(() => {});
+  }
+})();

@@ -65,7 +65,7 @@ test('PWA resources are served with installable manifest and an explicit offline
  assert.equal(manifestResponse.headers.get('content-type'),'application/manifest+json; charset=utf-8');
  assert.deepEqual(manifest.icons.map(icon=>icon.sizes),['192x192','512x512']);
  assert.equal(workerResponse.status,200);assert.match(worker,/url\.pathname\.startsWith\('\/api\/'\)/);
- assert.equal(installResponse.status,200);assert.match(install,/Safari/);assert.match(install,/Chrome/);
+ assert.equal(installResponse.status,200);assert.match(install,/Safari/);assert.match(install,/Android/);assert.match(install,/Ouvrir comme app web/);
  assert.equal(offlineResponse.status,200);assert.match(offline,/Cette page ne permet pas d’envoyer de réservation hors ligne/);
  assert.equal(iconResponse.headers.get('content-type'),'image/png');assert.equal(iconResponse.status,200);
 });
@@ -232,12 +232,13 @@ test('SQLite rejects overlapping active appointments at the data boundary',()=>{
  }finally{db.close();}
 });
 
-test('availability suppresses slots blocked by a Thomas Shop unavailability',async()=>{
+test('availability keeps blocked times visible but excludes them from selectable slots',async()=>{
  const [saturday]=upcomingWeekend();const db=new DatabaseSync(path.join(tempDir,'cutly.sqlite'));
  try{db.prepare("INSERT INTO unavailability(id,establishment_id,starts_at,ends_at,created_at) VALUES('block-am','thomas-shop',?,?,?)").run(`${saturday}T00:00:00.000Z`,`${saturday}T12:00:00.000Z`,new Date().toISOString());}
  finally{db.close();}
  const result=await (await fetch(`${baseUrl}/api/availability?service=contours&date=${saturday}`)).json();
  assert.ok(!result.slots.includes('09:00'));assert.ok(result.slots.includes('14:00'));
+ assert.equal(result.entries.find(entry=>entry.time==='09:00').status,'UNAVAILABLE');
 });
 
 test('booking service requires verified identity and creates an idempotent historical snapshot atomically',async()=>{
@@ -477,4 +478,79 @@ test('simultaneous bookings for one provider serialize and only one request rece
   assert.equal(results.filter(result=>result.status==='rejected'&&result.reason.code==='slot_unavailable').length,1);
   assert.equal((await db.prepare("SELECT COUNT(*) AS count FROM appointments WHERE client_user_id=? AND status='PENDING'").get(clientId)).count,1);
  }finally{await db.close();}
+});
+
+test('public day and month routes reflect real booking acceptance and rejection without customer details',async()=>{
+ const db=new DatabaseSync(path.join(tempDir,'cutly.sqlite')),stamp=new Date().toISOString(),[date]=upcomingWeekend(4);
+ try{
+  for(const [id,role] of [['grid-client','CLIENT'],['grid-admin','ESTABLISHMENT_ADMIN']])db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,role,created_at,updated_at) VALUES(?,?,?,'Private','Name','test-hash',?,?,?,?)`).run(id,`${id}@example.test`,id==='grid-client'?'+33799123991':'+33799123992',stamp,role,stamp,stamp);
+  db.prepare("INSERT INTO establishment_members(user_id,establishment_id,role) VALUES('grid-admin','thomas-shop','ESTABLISHMENT_ADMIN')").run();
+  const booking=await createBooking(db,{userId:'grid-client',serviceId:'coupe-classique',date,time:'10:00',idempotencyKey:'grid-booking-integration-key'});
+  const read=async()=>(await fetch(`${baseUrl}/api/availability?service=coupe-classique&date=${date}`)).json();
+  const pending=await read();
+  assert.equal(pending.entries.find(entry=>entry.time==='10:00').status,'OCCUPIED');
+  assert.equal(pending.entries.find(entry=>entry.time==='10:15').status,'OCCUPIED');
+  assert.equal(JSON.stringify(pending).includes('grid-client'),false);assert.equal(JSON.stringify(pending).includes('Private'),false);
+  const rejected=await transitionAppointment(db,{appointmentId:booking.id,actorId:'grid-admin',to:'REJECTED',expectedVersion:1,reason:'Test refusal'});
+  assert.equal(rejected.status,'REJECTED');assert.ok((await read()).slots.includes('10:00'));
+  const next=await createBooking(db,{userId:'grid-client',serviceId:'coupe-classique',date,time:'10:00',idempotencyKey:'grid-booking-integration-key-2'});
+  await transitionAppointment(db,{appointmentId:next.id,actorId:'grid-admin',to:'CONFIRMED',expectedVersion:1});
+  assert.equal((await read()).entries.find(entry=>entry.time==='10:00').status,'OCCUPIED');
+  const monthResponse=await fetch(`${baseUrl}/api/availability/month?service=coupe-classique&month=${date.slice(0,7)}`),month=await monthResponse.json();
+  assert.equal(monthResponse.status,200);assert.equal(month.timezone,'Europe/Paris');
+  assert.equal(month.days.find(day=>day.date===date).availableCount,(await read()).slots.length);
+  assert.equal(monthResponse.headers.get('cache-control'),'no-store');
+  const invalid=await fetch(`${baseUrl}/api/availability/month?service=coupe-classique&month=2030-99`);assert.equal(invalid.status,400);assert.equal((await invalid.json()).error,'invalid_month');
+ }finally{db.close();}
+});
+
+test('owned appointment detail and list expose latest cancellation status without leaking another account',async()=>{
+ const db=new DatabaseSync(path.join(tempDir,'cutly.sqlite')),stamp=new Date().toISOString(),[date]=upcomingWeekend(6);
+ const {createSession,cookieHeader}=require('../lib/auth');
+ try{
+  for(const id of ['detail-owner','detail-stranger'])db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,role,created_at,updated_at) VALUES(?,?,?,'Detail','Test','test-hash',?,'CLIENT',?,?)`).run(id,`${id}@example.test`,id==='detail-owner'?'+33799123993':'+33799123994',stamp,stamp,stamp);
+  const booking=await createBooking(db,{userId:'detail-owner',serviceId:'coupe-classique',date,time:'10:00',idempotencyKey:'detail-integration-booking-key'});
+  const ownerSession=await createSession(db,'detail-owner','test'),strangerSession=await createSession(db,'detail-stranger','test');
+  const cookie=cookieHeader(ownerSession.token).split(';')[0],strangerCookie=cookieHeader(strangerSession.token).split(';')[0];
+  const url=`${baseUrl}/api/client/appointments/${booking.id}`;
+  assert.equal((await fetch(url)).status,401);
+  assert.equal((await fetch(url,{headers:{cookie:strangerCookie}})).status,404);
+  assert.equal((await fetch(`${baseUrl}/api/client/appointments/not-existing`,{headers:{cookie}})).status,404);
+  const detail=await fetch(url,{headers:{cookie}}),first=(await detail.json()).appointment;
+  assert.equal(detail.status,200);assert.equal(first.id,booking.id);assert.equal(first.cancellationStatus,null);
+  assert.equal(detail.headers.get('cache-control'),'no-store');assert.ok(!('client_email' in first));assert.ok(!('private_notes' in first));
+  db.prepare(`INSERT INTO cancellation_requests(id,appointment_id,requested_by,status,reason,created_at) VALUES('detail-old',?,'detail-owner','REJECTED','PRIVATE TEST REASON','2020-01-01T00:00:00.000Z'),('detail-latest',?,'detail-owner','PENDING','PRIVATE TEST REASON',?)`).run(booking.id,booking.id,stamp);
+  const pending=(await (await fetch(url,{headers:{cookie}})).json()).appointment;
+  assert.equal(pending.cancellationStatus,'PENDING');assert.ok(!JSON.stringify(pending).includes('PRIVATE TEST REASON'));
+  const list=(await (await fetch(`${baseUrl}/api/client/appointments`,{headers:{cookie}})).json()).appointments;
+  assert.equal(list.length,1);assert.deepEqual(list[0],pending);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/client/appointments`,{headers:{cookie:strangerCookie}})).json()).appointments,[]);
+  db.prepare("UPDATE cancellation_requests SET status='ACCEPTED' WHERE id='detail-latest'").run();
+  assert.equal((await (await fetch(url,{headers:{cookie}})).json()).appointment.cancellationStatus,'ACCEPTED');
+  db.prepare('UPDATE sessions SET revoked_at=? WHERE user_id=?').run(stamp,'detail-owner');
+  assert.equal((await fetch(url,{headers:{cookie}})).status,401);
+ }finally{db.close();}
+});
+
+test('booking rejects changed catalogue expectations atomically and leaves the slot free',async()=>{
+ const db=new DatabaseSync(path.join(tempDir,'cutly.sqlite')),stamp=new Date().toISOString(),[date]=upcomingWeekend(7);
+ const {createSession,cookieHeader}=require('../lib/auth');
+ const original=db.prepare("SELECT price_cents,duration_minutes FROM services WHERE id='coupe-classique'").get();
+ try{
+  db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,role,created_at,updated_at) VALUES('price-check','price-check@example.test','+33799123995','Price','Test','test-hash',?,'CLIENT',?,?)`).run(stamp,stamp,stamp);
+  const session=await createSession(db,'price-check','test'),cookie=cookieHeader(session.token).split(';')[0];
+  const body={serviceId:'coupe-classique',date,time:'10:00',idempotencyKey:'price-expectation-integration-key',expectedPriceCents:original.price_cents,expectedDurationMinutes:original.duration_minutes};
+  const send=()=>fetch(`${baseUrl}/api/bookings`,{method:'POST',headers:{cookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify(body)});
+  db.prepare("UPDATE services SET price_cents=price_cents+100 WHERE id='coupe-classique'").run();
+  const changedPrice=await send();assert.equal(changedPrice.status,409);assert.equal((await changedPrice.json()).error,'service_changed');
+  db.prepare("UPDATE services SET price_cents=?,duration_minutes=duration_minutes+15 WHERE id='coupe-classique'").run(original.price_cents);
+  const changedDuration=await send();assert.equal(changedDuration.status,409);assert.equal((await changedDuration.json()).error,'service_changed');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM appointments WHERE client_user_id='price-check'").get().n,0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM idempotency_keys WHERE key=?').get(body.idempotencyKey).n,0);
+  const availability=await (await fetch(`${baseUrl}/api/availability?service=coupe-classique&date=${date}`)).json();assert.ok(availability.slots.includes('10:00'));
+  db.prepare("UPDATE services SET duration_minutes=? WHERE id='coupe-classique'").run(original.duration_minutes);
+  const accepted=await send();assert.equal(accepted.status,201);assert.equal((await accepted.json()).booking.priceCents,original.price_cents);
+  body.idempotencyKey='price-expectation-invalid-key';body.expectedPriceCents='500';
+  const invalid=await send();assert.equal(invalid.status,400);assert.equal((await invalid.json()).error,'invalid_booking_request');
+ }finally{db.prepare("UPDATE services SET price_cents=?,duration_minutes=? WHERE id='coupe-classique'").run(original.price_cents,original.duration_minutes);db.close();}
 });

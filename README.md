@@ -1,6 +1,6 @@
 # CUTLY
 
-Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite en développement local et PostgreSQL en hébergement. Render est la cible d’hébergement préparée ; le site n’est pas encore déployé publiquement.
+Plateforme de réservation pour Thomas Shop. Le projet utilise Node.js 24, SQLite en développement local et PostgreSQL en hébergement. Netlify est la cible d’hébergement préparée avec PostgreSQL Neon ; le projet Netlify existe, mais il reste privé et le backend de production n’est pas configuré.
 
 ## Démarrage local
 
@@ -40,8 +40,8 @@ La PWA utilise un cache limité à la page hors connexion, à la page d’instal
 
 ## Dépôt et hébergement
 
-Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly), branche `main`. Render Free est la cible préparée avec PostgreSQL externe gratuit ; consultez [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour les limites et les étapes. Le site client et `/admin.html` partagent la même application en ligne.
+Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly), branche `main`. Netlify sert les pages et les fonctions serverless ; Neon fournit PostgreSQL. Consultez [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) pour les prérequis et les étapes. Le site client et `/admin.html` partagent la même origine.
 
-Les fichiers Netlify sont conservés pour les anciens essais locaux, mais Render est la cible active. La migration SQLite vers PostgreSQL doit être précédée d’une sauvegarde vérifiée ; voir [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md).
+Une ancienne configuration Render est conservée dans le dépôt, mais Netlify est la cible active. La migration SQLite vers PostgreSQL doit être précédée d’une sauvegarde vérifiée ; voir [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md).
 
 L’état de préparation, les limitations et les étapes encore nécessaires figurent dans [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). Voir aussi [docs/PROVIDERS.md](docs/PROVIDERS.md) et [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).

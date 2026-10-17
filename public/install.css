@@ -1,12 +1,15 @@
-.wrap { width: min(100% - 40px, 760px); margin: 0 auto; padding: 36px 0 72px; }
-.wrap > .brand { font-size: 14px; }
-.wrap > .eyebrow { margin: 67px 0 16px; color: var(--accent); font-size: 12px; text-transform: uppercase; }
-.wrap h1 { max-width: 670px; margin: 0; font-size: clamp(44px, 8vw, 74px); font-weight: 580; line-height: 1.02; letter-spacing: -.065em; }
-.wrap h2 { margin: 36px 0 12px; font-size: 20px; font-weight: 620; letter-spacing: -.03em; }
-.wrap p, .wrap li { color: var(--muted); font-size: 16px; line-height: 1.75; }
-.wrap .steps { margin: 12px 0; padding-left: 24px; }
-.wrap .steps li { padding: 0 0 7px 5px; }
-.wrap .button { margin-top: 10px; background: var(--ink); color: #fff; }
-.wrap .note { margin-top: 38px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; }
-.wrap .back { display: inline-flex; margin-top: 20px; color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 600px) { .wrap { width: min(100% - 32px, 600px); padding-top: 24px; } .wrap > .eyebrow { margin-top: 47px; } }
+/* CUTLY — guide d'installation et page hors connexion (complète mobile-app.css). */
+.install-main{display:grid;gap:var(--s4)}
+.install-hero{display:grid;gap:var(--s3);padding:var(--s6) var(--s5);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-1)}
+.install-hero h1,.install-main>h1{font-size:clamp(28px,8vw,38px)}
+.install-hero>p:last-child,.install-main>p{color:var(--muted);font-size:15.5px}
+.install-icon .brand-mark{width:64px;height:64px;filter:drop-shadow(0 10px 18px rgb(22 21 15/.25))}
+.install-main section[data-install-platform]{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--shadow-1)}
+.install-main section[data-install-platform] h2{font-size:18px;margin-bottom:var(--s2)}
+.install-main .steps{margin:0;padding:0;list-style:none;counter-reset:step;display:grid;gap:var(--s3)}
+.install-main .steps li{counter-increment:step;display:flex;gap:var(--s3);align-items:flex-start;font-size:15.5px}
+.install-main .steps li::before{content:counter(step);display:grid;place-items:center;width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--ink);color:var(--paper);font-size:13px;font-weight:700}
+.install-main .install-help-title{font-weight:650}
+.install-main [data-install-safari-note]{margin-bottom:var(--s3)}
+.install-main .note{font-size:13.5px;color:var(--muted);padding-top:var(--s4);border-top:1px solid var(--line)}
+.install-main [data-install-status]:empty{display:none}

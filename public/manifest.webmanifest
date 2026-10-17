@@ -3,13 +3,38 @@
   "name": "CUTLY — Thomas Shop",
   "short_name": "CUTLY",
   "description": "Réservez votre rendez-vous chez Thomas Shop.",
+  "lang": "fr-FR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7f6f2",
   "theme_color": "#f7f6f2",
   "icons": [
-    { "src": "/icons/cutly-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/cutly-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/icons/cutly-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/cutly-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Réserver un créneau",
+      "short_name": "Réserver",
+      "url": "/booking.html",
+      "icons": [
+        {
+          "src": "/icons/cutly-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
