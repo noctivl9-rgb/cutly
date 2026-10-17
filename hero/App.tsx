@@ -17,10 +17,13 @@ const COPY = REFERENCE
 // Zone de message de l'écran du Nokia, mesurée dans la vidéo source (1920 × 1080).
 const VIDEO = { width: 1920, height: 1080 };
 const SCREEN = { left: 848, bottom: 752, width: 166, fontAt1x: 22 };
+// Axe vertical du Nokia dans la vidéo (corps du téléphone entre x≈765 et x≈1095).
+const PHONE_CENTER_X = 930;
 
-type Anchor = { left: number; bottom: number; width: number; fontSize: number } | null;
+type Anchor = { left: number; bottom: number; width: number; fontSize: number; objectPositionX: number } | null;
 
 // Reproduit le calcul d'object-cover pour que le texte reste sur l'écran du téléphone, quel que soit le cadrage.
+// Quand la vidéo est rognée sur les côtés (écran étroit, iPhone), le cadrage est décalé pour centrer le Nokia.
 function useScreenAnchor(frame: RefObject<HTMLDivElement | null>): Anchor {
   const [anchor, setAnchor] = useState<Anchor>(null);
   useLayoutEffect(() => {
@@ -30,9 +33,12 @@ function useScreenAnchor(frame: RefObject<HTMLDivElement | null>): Anchor {
       const { clientWidth: w, clientHeight: h } = node;
       if (!w || !h) return;
       const scale = Math.max(w / VIDEO.width, h / VIDEO.height);
-      const offsetX = (w - VIDEO.width * scale) / 2;
+      const overflowX = w - VIDEO.width * scale; // ≤ 0 : largeur rognée
+      const objectPositionX = overflowX < -1 ? Math.min(1, Math.max(0, (w / 2 - PHONE_CENTER_X * scale) / overflowX)) : 0.5;
+      const offsetX = overflowX * objectPositionX;
       const offsetY = (h - VIDEO.height * scale) / 2;
       setAnchor({
+        objectPositionX,
         left: offsetX + SCREEN.left * scale,
         bottom: h - (offsetY + SCREEN.bottom * scale),
         width: SCREEN.width * scale,
@@ -119,7 +125,7 @@ function Hero() {
   return (
     <section ref={section} aria-labelledby="hero-title" className="relative min-h-screen bg-[#F3F4ED] pt-24 md:pt-32 flex flex-col items-center overflow-hidden">
       <motion.div ref={frame} className="absolute inset-0 z-0 origin-center" style={{ scale: sceneScale }}>
-        <video className="absolute inset-0 w-full h-full object-cover" src={VIDEO_SRC} autoPlay loop muted playsInline preload="auto" aria-hidden="true" />
+        <video className="absolute inset-0 w-full h-full object-cover" style={anchor ? { objectPosition: `${(anchor.objectPositionX * 100).toFixed(2)}% 50%` } : undefined} src={VIDEO_SRC} autoPlay loop muted playsInline preload="auto" aria-hidden="true" />
         <div className="absolute inset-0 bg-white/5" />
         <TypingMessages anchor={anchor} />
       </motion.div>

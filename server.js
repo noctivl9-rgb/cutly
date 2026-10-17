@@ -248,7 +248,9 @@ function json(res,status,payload,extra={}) { res.writeHead(status,{'content-type
 function readBody(req){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>16_384){reject(new Error('body_too_large'));req.destroy();}});req.on('end',()=>{try{resolve(JSON.parse(raw||'{}'));}catch{reject(new Error('invalid_json'));}});req.on('error',reject);});}
 const loginAttempts=new Map();
 const dummyPasswordHash=hashPassword('CUTLY-unknown-account-password');
-function rateLimitKey(req,email){return `${req.socket.remoteAddress||'unknown'}:${String(email||'').trim().toLowerCase().slice(0,254)}`;}
+// Behind the Netlify function relay every request comes from 127.0.0.1: use the visitor address the relay forwards.
+function clientAddress(req){const local=req.socket.remoteAddress;if(process.env.CUTLY_BEHIND_FUNCTION_PROXY==='1'&&(local==='127.0.0.1'||local==='::ffff:127.0.0.1')&&typeof req.headers['x-cutly-client-ip']==='string')return req.headers['x-cutly-client-ip'].slice(0,64);return local||'unknown';}
+function rateLimitKey(req,email){return `${clientAddress(req)}:${String(email||'').trim().toLowerCase().slice(0,254)}`;}
 function allowPublicAttempt(key,limit=5,windowMs=15*60*1000){return consumeAttempt(db,key,limit,windowMs);}
 function checkSameOrigin(req){const origin=req.headers.origin;if(!origin)return process.env.NODE_ENV!=='production';try{return new URL(origin).host===req.headers.host;}catch{return false;}}
 function sessionFor(req){return sessionFromRequest(db,req);}
