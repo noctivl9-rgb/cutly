@@ -221,12 +221,18 @@ for (let day=0; day<7; day++) seedHours.run(shop.id,day,(day===0||day===6)?'09:0
 
 }
 
+// Latest version recorded by db/postgres/schema.sql (and the Netlify Database migration copy).
+const POSTGRES_SCHEMA_VERSION=7;
 async function initializePostgres(){
  if(db.kind!=='POSTGRES')return;
  const schema=fs.readFileSync(path.join(ROOT,'db/postgres/schema.sql'),'utf8');
  await db.transaction(async tx=>{
   await tx.lock('cutly:initialize-postgres-schema');
-  await tx.exec(schema);
+  // Netlify Database applies the schema through migrations and its runtime role cannot run DDL:
+  // only create the schema here when the current version is not already present.
+  const registry=await tx.prepare("SELECT to_regclass('public.schema_migrations') IS NOT NULL AS present").get();
+  const current=registry?.present?await tx.prepare('SELECT MAX(version) AS version FROM schema_migrations').get():null;
+  if(!(Number(current?.version)>=POSTGRES_SCHEMA_VERSION))await tx.exec(schema);
   await tx.prepare(`INSERT INTO establishments(id,name,address,phone,instagram,description,timezone) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).run(shop.id,shop.name,shop.address,shop.phone,shop.instagram,shop.description,'Europe/Paris');
   const services=[['degrade-classique','Dégradé classique',500,30,1],['burst-fade','Burst Fade',700,30,1],['taper','Taper',500,30,1],['coupe-classique','Coupe classique',500,30,1],['contours','Contours',500,15,0]];
   for(const [id,name,price,duration,eligible] of services)await tx.prepare('INSERT INTO services(id,establishment_id,name,price_cents,duration_minutes,eligible) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,shop.id,name,price,duration,eligible);
