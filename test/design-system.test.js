@@ -55,3 +55,21 @@ test('booking steps keep a visible back link and step caption, and the home page
   assert.ok(primary > 0 && primary < secondary, 'Réserver une coupe is the first action');
   assert.doesNotMatch(home.slice(0, primary), /Appeler/);
 });
+
+test('home hero follows the provided spec: pill navbar, booking CTA, typing timings and motion curves', () => {
+  const home = read('index.html');
+  assert.match(home, /<a class="hero-logo font-instrument" href="\/"[^>]*>CUTLY<\/a>/);
+  assert.match(home, /<a class="hero-cta group" href="\/booking\.html">[\s\S]*?Réserver une coupe/);
+  const links = [...home.match(/<div class="hero-links">([\s\S]*?)<\/div>/)[1].matchAll(/href="\/([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(links, ['services.html', 'shop.html', 'appointments.html', 'loyalty.html']);
+  for (const target of links) assert.ok(fs.existsSync(path.join(publicPath, target)));
+  assert.match(home, /data-typing-messages/);
+  const script = read('home-hero.js');
+  assert.match(script, /TYPING = 100, DELETING = 50, PAUSE = 2000/);
+  const css = read('home-hero.css');
+  assert.match(css, /--hero-ease:cubic-bezier\(\.16,1,\.3,1\)/);
+  assert.match(css, /\.hero-headline\{margin-bottom:24px;animation:hero-headline 1\.5s var\(--hero-ease\) both\}/);
+  assert.match(css, /\.hero-subline\{animation:hero-subline 1\.2s \.3s var\(--hero-ease\) both\}/);
+  assert.match(css, /animation:cursor-blink \.8s linear infinite/);
+  assert.doesNotMatch(css, /url\(\s*['"]?https?:/, 'no remote asset (CSP)');
+});
