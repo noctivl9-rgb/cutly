@@ -22,8 +22,15 @@ async function main() {
   } catch { key = ''; }
   if (Buffer.from(key, 'base64').length !== 32) throw new Error('Clé CUTLY_MFA_ENCRYPTION_KEY introuvable sur Netlify (exécutez la commande dans le dossier du projet relié à Netlify).');
 
-  const url = await ask('Chaîne de connexion (masquée) : ', { hidden: true });
+  // Rien ne s'affiche pendant la saisie : on redemande si la réponse est vide, puis on confirme sans révéler la chaîne.
+  let url = process.env.CUTLY_DATABASE_URL || '';
+  for (let attempt = 1; !url && attempt <= 3; attempt++) {
+    url = await ask('Collez la chaîne de connexion (clic droit), puis Entrée — rien ne s’affiche : ', { hidden: true });
+    if (!url) console.log('Aucune chaîne reçue. Recommencez : clic droit pour coller, puis Entrée.');
+  }
   if (!/^postgres(ql)?:\/\//.test(url)) throw new Error('La chaîne de connexion doit commencer par postgres:// ou postgresql://');
+  try { const host = new URL(url).hostname; console.log(`Chaîne reçue (${url.length} caractères, serveur ${host.split('.').slice(-3).join('.')}).`); }
+  catch { throw new Error('La chaîne de connexion est illisible.'); }
   const email = await ask('E-mail de l’administrateur : ');
   const password = await ask('Mot de passe (12 caractères minimum, masqué) : ', { hidden: true });
   const confirmation = await ask('Confirmez le mot de passe (masqué) : ', { hidden: true });
