@@ -288,14 +288,14 @@ const server=http.createServer(async(req,res)=>{
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await resetClientPassword(db,{token:body.token,newPassword:body.newPassword}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/login'){
-   const body=await readBody(req);if(!await consumeAttempt(db,`client-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=`client:${rateLimitKey(req,body.email)}`,windowMs=15*60*1000,now=Date.now(),bucket=loginAttempts.get(key);
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);if(!await consumeAttempt(db,`client-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=`client:${rateLimitKey(req,body.email)}`,windowMs=15*60*1000,now=Date.now(),bucket=loginAttempts.get(key);
    if(bucket&&bucket.until>now&&bucket.count>=5)return json(res,429,{error:'too_many_attempts'},{'retry-after':String(Math.ceil((bucket.until-now)/1000))});
     const email=typeof body.email==='string'?body.email.trim().toLowerCase():'';const user=await db.prepare("SELECT id,email,password_hash,role,disabled_at FROM users WHERE lower(email)=lower(?) AND role='CLIENT'").get(email);
    const passwordOk=await verifyPassword(String(body.password||''),user?.password_hash||await dummyPasswordHash);if(!user||user.disabled_at||!passwordOk){const current=loginAttempts.get(key);loginAttempts.set(key,{count:(current&&current.until>now?current.count:0)+1,until:current&&current.until>now?current.until:now+windowMs});return json(res,401,{error:'invalid_credentials'});}
     loginAttempts.delete(key);const session=await createSession(db,user.id,req.headers['user-agent']);return json(res,200,{user:{email:user.email,role:user.role},expiresAt:session.expiresAt},{'set-cookie':cookieHeader(session.token)});
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/admin/login'){
-   const body=await readBody(req);if(!await consumeAttempt(db,`admin-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=rateLimitKey(req,body.email),windowMs=15*60*1000,now=Date.now();
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);if(!await consumeAttempt(db,`admin-login:${String(body.email||'').trim().toLowerCase()}`,10,15*60*1000))return json(res,429,{error:'too_many_attempts'});const key=rateLimitKey(req,body.email),windowMs=15*60*1000,now=Date.now();
    const bucket=loginAttempts.get(key);if(bucket&&bucket.until>now&&bucket.count>=5)return json(res,429,{error:'too_many_attempts'},{'retry-after':String(Math.ceil((bucket.until-now)/1000))});
    const normalized=typeof body.email==='string'?body.email.trim().toLowerCase():'';
     const user=await db.prepare("SELECT id,email,password_hash,role,disabled_at FROM users WHERE lower(email)=lower(?)").get(normalized);

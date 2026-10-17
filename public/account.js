@@ -39,10 +39,16 @@
     if (form.dataset.busy) return;
     form.dataset.busy = 'true';
     const buttons = [...form.querySelectorAll('button[type="submit"]')];
-    buttons.forEach(button => { button.disabled = true; });
+    // États du bouton : chargement (aria-busy), erreur (.is-error), puis retour à l'état normal.
+    buttons.forEach(button => { button.disabled = true; button.setAttribute('aria-busy', 'true'); button.classList.remove('is-error'); });
     output.textContent = 'En cours…';
-    try { await action(); } catch (error) { output.textContent = message(error); }
-    finally { delete form.dataset.busy; buttons.forEach(button => { button.disabled = false; }); }
+    try { await action(); }
+    catch (error) {
+      output.textContent = message(error);
+      buttons.forEach(button => { button.classList.add('is-error'); setTimeout(() => button.classList.remove('is-error'), 1600); });
+      window.CutlyFeedback?.('error');
+    }
+    finally { delete form.dataset.busy; buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); }); }
   }
   window.CutlyAccount = { api, safeReturn, message, submit };
   if (!document.querySelector('#identity-page')) return;

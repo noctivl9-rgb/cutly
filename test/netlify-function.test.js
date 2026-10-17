@@ -46,3 +46,12 @@ test('rate limiting trusts the forwarded visitor address only behind the local f
   const relay = fs.readFileSync(path.join(__dirname, '..', 'netlify', 'functions', 'api.mjs'), 'utf8');
   assert.match(relay, /key !== 'x-cutly-client-ip'/, 'client-supplied forwarding header is discarded');
 });
+
+test('client and admin login reject cross-site requests like every other state-changing route', () => {
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  for (const route of ['/api/auth/client/login', '/api/auth/admin/login']) {
+    const start = server.indexOf(`url.pathname==='${route}'`);
+    assert.ok(start > 0, `${route} exists`);
+    assert.match(server.slice(start, start + 220), /checkSameOrigin\(req\)\)return json\(res,403,\{error:'origin_rejected'\}\)/, `${route} checks origin`);
+  }
+});

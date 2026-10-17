@@ -1,68 +1,70 @@
-/* CUTLY — espace client. Utilise les jetons de mobile-app.css. */
+/* CUTLY — espace client. Utilise les jetons de mobile-app.css (design « Éditorial »). */
 .client-content{max-width:680px;margin-inline:auto}
-.client-content>div>.page-title,.client-content>.page-title,#identity-page>.page-title{margin-bottom:var(--s2)}
-.client-content #client-page-content>.muted,#identity-page>.muted{margin-bottom:var(--s5)}
-.client-content #client-page-content>a:first-child{display:inline-flex;align-items:center;min-height:44px;margin:0 0 var(--s1) -2px;text-decoration:none;font-size:15px;font-weight:550;color:var(--ink-2)}
+.client-content #client-page-content>.page-title,#identity-page>.page-title{margin-bottom:var(--s2)}
+.client-content #client-page-content>.muted,#identity-page>.muted{margin-bottom:var(--s5);font-size:14.5px}
+.client-content #client-page-content>a:first-child{display:inline-flex;align-items:center;min-height:40px;margin:0 0 var(--s1) -2px;text-decoration:none;font-size:14.5px;font-weight:500;color:var(--ink-2)}
 
 /* Formulaires */
 .client-form{display:grid;gap:var(--s4)}
-.client-form label{display:grid;gap:7px;font-size:15px;font-weight:600}
-.client-form input,.client-form select,.client-form textarea{width:100%;min-height:50px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink);font:inherit;font-size:16px;font-weight:400}
+.client-form label{display:grid;gap:6px;font-size:14px;font-weight:500;color:var(--ink-2)}
+.client-form input,.client-form select,.client-form textarea{width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-ctl);background:var(--surface);color:var(--ink);font:inherit;font-size:16px;font-weight:400}
 .client-form textarea{resize:vertical}
-.client-form .check{display:flex;gap:12px;align-items:flex-start;font-weight:400;font-size:15px}
-.client-form .check input{width:22px;min-height:22px;height:22px;flex-shrink:0;margin-top:1px}
+.client-form .check{display:flex;gap:12px;align-items:flex-start;font-weight:400;font-size:14.5px;color:var(--ink)}
+.client-form .check input{width:20px;min-height:20px;height:20px;flex-shrink:0;margin-top:2px}
 .client-form .button{width:100%}
-.client-links{display:flex;flex-wrap:wrap;gap:4px 20px;margin-top:var(--s5)}
-.client-links a,.client-form a{text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
-.client-content section[data-auth-panel]{margin-top:var(--s5);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--shadow-1)}
-.client-content section[data-auth-panel]>p:first-child{color:var(--muted);margin-bottom:var(--s4);font-size:15px}
+.client-links{display:flex;flex-wrap:wrap;gap:0 var(--s5);margin-top:var(--s4)}
+.client-links a,.client-form a{text-decoration:underline;text-decoration-color:var(--line-strong);min-height:44px;display:inline-flex;align-items:center;font-size:14.5px}
+.client-content section[data-auth-panel]{margin-top:var(--s5);padding-top:var(--s5);border-top:1px solid var(--line)}
+.client-content section[data-auth-panel]>p:first-child{color:var(--muted);margin-bottom:var(--s4);font-size:14.5px}
 
-/* Onglets segmentés */
-.client-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:var(--s4) 0 var(--s5);padding:4px;background:var(--paper-2);border-radius:var(--r-md)}
-.client-tabs a{min-height:40px;display:flex;align-items:center;justify-content:center;padding:6px 8px;border-radius:11px;color:var(--ink-2);text-decoration:none;font-size:14.5px;font-weight:600;transition:background var(--fast),color var(--fast)}
-.client-tabs a[aria-current=page]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(22 21 15/.12)}
+/* Onglets : soulignement, pas de pastilles */
+.client-tabs{display:flex;gap:var(--s5);margin:var(--s3) 0 var(--s2);border-bottom:1px solid var(--line)}
+.client-tabs a{position:relative;min-height:44px;display:inline-flex;align-items:center;color:var(--muted);text-decoration:none;font-size:14.5px;font-weight:500;transition:color var(--fast)}
+.client-tabs a:hover{color:var(--ink)}
+.client-tabs a[aria-current=page]{color:var(--ink)}
+.client-tabs a[aria-current=page]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--ink)}
 
-/* Cartes de rendez-vous */
-.appointment-link{display:flex;gap:var(--s4);align-items:flex-start;color:inherit;text-decoration:none;padding:var(--s4);border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow-1);transition:border-color var(--fast),transform var(--fast) var(--ease);animation:rise .3s var(--ease) both}
-.appointment-link:hover{border-color:var(--line-strong)}
-.appointment-link:active{transform:scale(.985)}
-.date-tile{display:grid;justify-items:center;align-content:center;width:58px;min-height:66px;flex-shrink:0;border-radius:var(--r-md);background:var(--ink);color:var(--paper);padding:6px 0;text-transform:uppercase;font-size:10.5px;font-weight:650;letter-spacing:.08em;line-height:1.2}
-.date-tile strong{font-size:23px;letter-spacing:-.02em;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}
-.date-tile span:last-child{color:#e0a07f}
-.appointment-body{display:grid;gap:3px;min-width:0;flex:1}
-.appointment-body strong{font-size:17px;font-weight:650;letter-spacing:-.01em}
-.appointment-when{font-size:15px}
-.appointment-body .muted{font-size:14px}
-.appointment-body .client-status{margin-top:6px}
+/* Rendez-vous : liste éditoriale (date à gauche, détails à droite) */
+#appointments-list{gap:0}
+.appointment-link{display:flex;gap:var(--s4);align-items:flex-start;color:inherit;text-decoration:none;padding:var(--s4) 0;border-bottom:1px solid var(--line);transition:background var(--fast)}
+.appointment-link:hover .appointment-body strong{text-decoration:underline;text-decoration-color:var(--line-strong)}
+.date-tile{display:grid;justify-items:start;align-content:start;width:52px;flex-shrink:0;padding-top:2px;line-height:1.1}
+.date-tile span{font-size:12px;font-weight:500;color:var(--muted);text-transform:capitalize}
+.date-tile strong{font-family:var(--font-display);font-weight:400;font-size:34px;line-height:1;color:var(--ink);font-variant-numeric:lining-nums}
+.appointment-body{display:grid;gap:2px;min-width:0;flex:1}
+.appointment-body strong{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.appointment-when{font-size:14.5px;color:var(--ink-2)}
+.appointment-body .muted{font-size:13.5px}
+.appointment-body .client-status{margin-top:4px}
 
 /* Détail */
 .client-details{display:grid;margin:0}
-.client-details div{display:grid;grid-template-columns:1fr 1.5fr;gap:var(--s4);padding:12px 0;border-bottom:1px solid var(--line)}
+.client-details div{display:grid;grid-template-columns:1fr 1.5fr;gap:var(--s4);padding:11px 0;border-bottom:1px solid var(--line)}
 .client-details div:last-child{border-bottom:0}
-.client-details dt{color:var(--muted);font-size:15px}
-.client-details dd{margin:0;text-align:right;font-weight:600;overflow-wrap:anywhere}
+.client-details dt{color:var(--muted);font-size:14.5px}
+.client-details dd{margin:0;text-align:right;font-weight:500;overflow-wrap:anywhere}
 
 /* Menus et listes */
-.client-menu{display:grid;margin-top:var(--s5);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:0 var(--s4);box-shadow:var(--shadow-1)}
-.client-menu a{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:54px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;font-weight:550}
-.client-menu a:last-child{border-bottom:0}
-.client-menu a::after{content:"";width:8px;height:8px;border-right:1.7px solid var(--muted);border-top:1.7px solid var(--muted);transform:rotate(45deg)}
+.client-menu{display:grid;margin-top:var(--s5);border-top:1px solid var(--line)}
+.client-menu a{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;border-bottom:1px solid var(--line);color:inherit;text-decoration:none;font-weight:500}
+.client-menu a::after{content:"";width:7px;height:7px;border-right:1.5px solid var(--faint);border-top:1.5px solid var(--faint);transform:rotate(45deg)}
 .client-ledger{list-style:none;padding:0;margin:0}
-.client-ledger li{padding:14px 0;border-bottom:1px solid var(--line)}
+.client-ledger li{padding:12px 0;border-bottom:1px solid var(--line)}
 .client-ledger li:last-child{border-bottom:0}
-.client-ledger p{margin:4px 0 0}
-#account-rewards .list-row .button{width:auto;min-height:44px;font-size:14.5px}
+.client-ledger p{margin:3px 0 0}
+#account-rewards .list-row .button{width:auto;min-height:40px;font-size:14px}
 
-.client-message{min-height:1.5em;color:var(--ink-2);overflow-wrap:anywhere;font-size:15px}
+.client-message{min-height:1.5em;color:var(--ink-2);overflow-wrap:anywhere;font-size:14.5px}
 .client-message:empty{min-height:0}
-.client-loading{color:var(--muted);display:flex;align-items:center;gap:10px;padding:var(--s4) 0}
-.client-loading::before{content:"";width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);border-top-color:var(--ink);animation:spin .8s linear infinite}
+.client-loading{color:var(--muted);display:flex;align-items:center;gap:10px;padding:var(--s4) 0;font-size:14.5px}
+.client-loading::before{content:"";width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line-strong);border-top-color:var(--ink);animation:spin .8s linear infinite}
 #client-error{display:grid;gap:var(--s3)}
 #client-error a{font-weight:600}
-.client-content h2{font-size:20px;line-height:1.3;margin:0 0 var(--s3)}
-.client-content .panel{margin-top:var(--s4)}
-.client-content section+section{margin-top:var(--s5)}
+.client-content h2{font-size:24px;margin:0 0 var(--s3)}
+.client-content .panel{margin-top:var(--s4);padding:4px var(--s4)}
+.client-content .panel:has(form){padding:var(--s5)}
+.client-content section+section{margin-top:var(--s6)}
 .client-content [hidden]{display:none!important}
 #load-more{width:100%}
-.profile-form-title{margin-top:var(--s6)!important}
-@media(max-width:340px){.client-details div{grid-template-columns:1fr;gap:4px}.client-details dd{text-align:left}.date-tile{width:52px}}
+.profile-form-title{margin-top:var(--s8)!important}
+@media(max-width:340px){.client-details div{grid-template-columns:1fr;gap:4px}.client-details dd{text-align:left}}

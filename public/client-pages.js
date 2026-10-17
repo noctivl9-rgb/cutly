@@ -105,7 +105,7 @@
         const form = el('form', undefined, 'client-form');
         const label = el('label', 'Motif (facultatif)'), reason = el('textarea'); reason.name = 'reason'; reason.maxLength = 500; reason.rows = 2; label.append(reason);
         const checkLabel = el('label', undefined, 'check'), check = el('input'); check.type = 'checkbox'; check.required = true; checkLabel.append(check, el('span', 'Je confirme vouloir annuler ce rendez-vous.'));
-        const button = el('button', direct ? 'Annuler ce rendez-vous' : 'Demander l’annulation', 'button secondary'); button.type = 'submit';
+        const button = el('button', direct ? 'Annuler ce rendez-vous' : 'Demander l’annulation', 'button danger'); button.type = 'submit';
         const output = el('p', '', 'client-message'); output.setAttribute('role', 'status');
         form.append(label, checkLabel, button, output);
         form.addEventListener('submit', event => { event.preventDefault(); submit(form, async () => {

@@ -9,11 +9,13 @@ const clientPages = ['index.html', 'services.html', 'shop.html', 'booking.html',
   'appointments.html', 'appointment.html', 'history.html', 'account.html', 'profile.html', 'settings.html', 'loyalty.html',
   'terms.html', 'privacy.html', 'legal.html', 'terms-of-use.html', 'cancellation.html', 'install.html'];
 
-test('every client page shares the CUTLY brand, stylesheet and four-tab iPhone navigation', () => {
+test('every client page shares the CUTLY island, stylesheet and four-tab iPhone navigation', () => {
   for (const page of clientPages) {
     const html = read(page);
     assert.match(html, /href="\/mobile-app\.css"/, `${page} uses the design system`);
-    assert.match(html, /class="brand-mark"/, `${page} shows the CUTLY mark`);
+    assert.ok(html.includes('<script src="/island.js" defer></script>'), `${page} loads the island behaviour`);
+    if (page !== 'index.html') assert.match(html, /<header class="island" data-island>[\s\S]*class="island-toggle"[\s\S]*<\/header>/, `${page} shows the CUTLY island`);
+    else assert.ok(read('assets/home/home.js').includes('island-bar'), 'home island rendered by React');
     const navs = html.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/g) || [];
     assert.equal(navs.length, 1, `${page} has one bottom navigation`);
     const targets = [...navs[0].matchAll(/<a href="([^"]+)"/g)].map(match => match[1]);

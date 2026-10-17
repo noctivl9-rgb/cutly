@@ -91,21 +91,38 @@ function TypingMessages({ anchor }: { anchor: Anchor }) {
 
 function Navbar() {
   const links = COPY.links;
+  // Même « Dynamic Island » que les autres pages (styles et comportement : mobile-app.css et island.js).
+  const panelLinks = [['Prestations', '/services.html'], ['Le salon et les avis', '/shop.html'], ['Fidélité', '/loyalty.html'], ['Conditions générales', '/terms.html']];
   return (
-    <div className="fixed top-6 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50 pointer-events-none" style={{ top: 'calc(1.5rem + env(safe-area-inset-top))' }}>
-      <nav aria-label="Navigation de l’accueil" className="hero-pill pointer-events-auto backdrop-blur-md rounded-full bg-transparent border border-black/10 flex items-center justify-between pl-6 pr-2 py-2">
-        <a href="/" aria-label="CUTLY, accueil" className="font-instrument text-[28px] tracking-tight text-[#1a1a1a] leading-none no-underline">{COPY.logo}</a>
-        <div className="hidden md:flex items-center gap-10">
-          {links.map(link => (
-            <a key={link.href} href={link.href} className="font-sans text-[14px] text-[#1a1a1a] no-underline transition-opacity duration-300 hover:opacity-60">{link.label}</a>
-          ))}
+    <header className="island" data-island>
+      <div className="island-shell">
+        <div className="island-bar">
+          <a className="island-logo" href="/" aria-label="CUTLY, accueil">{COPY.logo}</a>
+          <nav className="island-links" aria-label="Navigation principale">
+            {links.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
+          </nav>
+          <a className="island-account" href="/profile.html" aria-label="Mon profil">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></svg>
+          </a>
+          <a className="island-cta" href="/booking.html">{REFERENCE ? COPY.cta : 'Réserver'}</a>
+          <button className="island-toggle" type="button" data-island-toggle aria-expanded="false" aria-controls="island-panel">
+            Thomas Shop<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
         </div>
-        <a href="/booking.html" className="group liquid-cta relative overflow-hidden inline-flex items-center rounded-full bg-[#0871E7] text-white font-sans text-[14px] font-medium px-5 py-2.5 no-underline shadow-[inset_0_-4px_4px_rgba(255,255,255,0.39)] outline-1 outline-[#0871E7] -outline-offset-1">
-          <span aria-hidden="true" className="absolute w-[80%] h-4 left-[10%] top-[1px] bg-gradient-to-b from-[#DEF0FC] to-transparent rounded-[12px] transition-transform duration-500 group-hover:scale-x-105" />
-          <span className="relative">{COPY.cta}</span>
-        </a>
-      </nav>
-    </div>
+        <div className="island-panel" id="island-panel">
+          <div>
+            <div className="island-panel-inner">
+              <p className="island-shop">Thomas Shop</p>
+              <p className="island-status" data-island-status role="status" />
+              <p className="island-meta">8 cours de l’Île Seguin, Boulogne-Billancourt</p>
+              <nav className="island-panel-links" aria-label="Liens secondaires">
+                {panelLinks.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }
 
@@ -146,6 +163,10 @@ function Hero() {
           className="font-sans text-[16px] md:text-[18px] text-[#1a1a1a]/70 leading-relaxed font-normal max-w-xl mx-auto"
         >
           <p className="m-0 font-sans text-[16px] md:text-[18px] text-[#1a1a1a]/70 leading-relaxed font-normal">{COPY.subtitle}</p>
+        </motion.div>
+        {/* Sur iPhone l'île ne porte pas « Réserver » : l'action principale est ici, bien visible. */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5, ease: EASE }} className="hero-cta-mobile pointer-events-auto mt-7">
+          <a className="button" href="/booking.html">Réserver une coupe</a>
         </motion.div>
       </motion.div>
     </section>
