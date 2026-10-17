@@ -11,7 +11,8 @@
     "migrate:sqlite-to-postgres": "node --env-file-if-exists=.env.local scripts/migrate-sqlite-to-postgres.js",
     "test": "node --test",
     "backup:postgres": "node --env-file-if-exists=.env.local scripts/backup-postgres.js",
-    "build": "npm run check"
+    "build": "npm run check",
+    "build:home": "vite build --config vite.home.config.mjs"
   },
   "engines": {
     "node": ">=24.20.0 <25"
@@ -22,6 +23,13 @@
   },
   "devDependencies": {
     "@neon/config": "^1.9.1",
-    "@neon/env": "^1.6.2"
+    "@neon/env": "^1.6.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "motion": "^12.43.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^7.3.7"
   }
 }

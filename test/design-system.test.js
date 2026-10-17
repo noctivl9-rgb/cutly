@@ -56,20 +56,22 @@ test('booking steps keep a visible back link and step caption, and the home page
   assert.doesNotMatch(home.slice(0, primary), /Appeler/);
 });
 
-test('home hero follows the provided spec: pill navbar, booking CTA, typing timings and motion curves', () => {
+test('home hero is the React build of the provided spec, adapted to CUTLY, with self-hosted assets', () => {
   const home = read('index.html');
-  assert.match(home, /<a class="hero-logo font-instrument" href="\/"[^>]*>CUTLY<\/a>/);
-  assert.match(home, /<a class="hero-cta group" href="\/booking\.html">[\s\S]*?Réserver une coupe/);
-  const links = [...home.match(/<div class="hero-links">([\s\S]*?)<\/div>/)[1].matchAll(/href="\/([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(links, ['services.html', 'shop.html', 'appointments.html', 'loyalty.html']);
-  for (const target of links) assert.ok(fs.existsSync(path.join(publicPath, target)));
-  assert.match(home, /data-typing-messages/);
-  const script = read('home-hero.js');
-  assert.match(script, /TYPING = 100, DELETING = 50, PAUSE = 2000/);
-  const css = read('home-hero.css');
-  assert.match(css, /--hero-ease:cubic-bezier\(\.16,1,\.3,1\)/);
-  assert.match(css, /\.hero-headline\{margin-bottom:24px;animation:hero-headline 1\.5s var\(--hero-ease\) both\}/);
-  assert.match(css, /\.hero-subline\{animation:hero-subline 1\.2s \.3s var\(--hero-ease\) both\}/);
-  assert.match(css, /animation:cursor-blink \.8s linear infinite/);
+  assert.ok(home.includes('<div id="cutly-home-root"></div>'));
+  assert.ok(home.includes('<script type="module" src="/assets/home/home.js"></script>'));
+  assert.ok(home.includes('<link rel="stylesheet" href="/assets/home/home.css">'));
+  for (const file of ['assets/home/home.js', 'assets/home/home.css', 'media/cutly-hero.mp4', 'fonts/InstrumentSerif-Regular.ttf', 'fonts/Inter-Variable.ttf', 'fonts/PixelifySans-Variable.ttf']) {
+    assert.ok(fs.existsSync(path.join(publicPath, file)), `${file} is published`);
+  }
+  const bundle = read('assets/home/home.js');
+  for (const text of ['Réserver une coupe', '/booking.html', '/services.html', '/shop.html', '/appointments.html', '/loyalty.html', 'Coupe nette.', 'Heure juste.', '/media/cutly-hero.mp4']) assert.ok(bundle.includes(text), `bundle contains ${text}`);
+  assert.doesNotMatch(bundle, /Short notes|Link up|Philosophy/, 'reference copy never ships');
+  const source = fs.readFileSync(path.join(__dirname, '../hero/App.tsx'), 'utf8');
+  for (const snippet of ['deleting ? 50 : 100', 'setTimeout(() => setDeleting(true), 2000)', 'const EASE = [0.16, 1, 0.3, 1]',
+    'duration: 1.5, ease: EASE', 'duration: 1.2, delay: 0.3, ease: EASE', "duration: 0.8, repeat: Infinity, ease: 'linear'"]) {
+    assert.ok(source.includes(snippet), `App.tsx keeps ${snippet}`);
+  }
+  const css = read('assets/home/home.css');
   assert.doesNotMatch(css, /url\(\s*['"]?https?:/, 'no remote asset (CSP)');
 });

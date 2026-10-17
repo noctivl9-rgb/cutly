@@ -1,0 +1,46 @@
+/* CUTLY — accueil (React 19 + Tailwind CSS v4 + motion/react).
+   Pas de preflight : cette feuille s'ajoute à mobile-app.css sans réinitialiser le reste de l'accueil.
+   « important » : les utilitaires du Hero l'emportent sur les styles globaux existants (h1, a, svg…). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) important source(none);
+@source "./";
+
+/* Polices auto-hébergées (google/fonts, SIL OFL 1.1) — remplacent les imports distants du prompt, bloqués par la CSP.
+   « Nokia Cellphone FC Small » (licence non vérifiée) est remplacée par Pixelify Sans (OFL). */
+@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Italic.ttf") format("truetype");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"Inter";src:url("/fonts/Inter-Variable.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Pixelify Sans";src:url("/fonts/PixelifySans-Variable.ttf") format("truetype");font-weight:400 700;font-style:normal;font-display:swap}
+
+@theme {
+  --font-instrument: "Instrument Serif", serif;
+  --font-serif: "Instrument Serif", serif;
+  --font-sans: "Inter", sans-serif;
+  --font-nokia: "Pixelify Sans", monospace;
+}
+
+@utility font-instrument {
+  font-family: "Instrument Serif", serif;
+}
+
+/* Racine de l'accueil : Inter + lissage (non stratifié pour primer sur mobile-app.css). */
+:root{font-family:var(--font-sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body[data-page=home]{background:#F3F4ED}
+#cutly-home-root{min-height:100vh;min-height:100svh;background:#F3F4ED}
+
+/* Barre inférieure : masquée tant que la scène d'accueil est visible, puis elle remonte. */
+body[data-page=home] .bottom-nav{transition:transform .5s cubic-bezier(.16,1,.3,1),opacity .35s ease}
+body[data-page=home].hero-in-view .bottom-nav{transform:translateY(calc(100% + 40px));opacity:0;pointer-events:none}
+
+/* Contenu existant sous le Hero : apparition au défilement et jeu typographique. */
+body[data-page=home] .home-content h2{font-family:var(--font-instrument);font-weight:400;font-size:34px;line-height:1;letter-spacing:-.02em}
+body[data-page=home] .home-content .section-head{margin-top:var(--s6,24px)}
+.reveal{opacity:0;transform:translateY(28px);filter:blur(10px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1),filter .9s cubic-bezier(.16,1,.3,1)}
+.reveal.is-visible{opacity:1;transform:none;filter:none}
+@media (prefers-reduced-motion: reduce){.reveal{opacity:1;transform:none;filter:none;transition:none}}
+
+/* Une fois la scène d'accueil dépassée, la pilule de navigation passe en liquid glass pour rester lisible. */
+.hero-pill{transition:background .5s cubic-bezier(.16,1,.3,1),box-shadow .5s cubic-bezier(.16,1,.3,1),border-color .5s}
+body:not(.hero-in-view) .hero-pill{background:linear-gradient(135deg,rgb(255 255 255/.66),rgb(255 255 255/.3))!important;-webkit-backdrop-filter:blur(24px) saturate(1.9)!important;backdrop-filter:blur(24px) saturate(1.9)!important;border-color:rgb(255 255 255/.7)!important;
+  box-shadow:inset 0 1px 0 rgb(255 255 255/.95),inset 0 -1px 1px rgb(255 255 255/.35),0 18px 40px -18px rgb(22 21 15/.35)}
