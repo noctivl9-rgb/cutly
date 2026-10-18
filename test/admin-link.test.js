@@ -52,3 +52,18 @@ test('lien privé administrateur : 24 h, réutilisable, révoqué par le suivant
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('liens permanents : seule l’empreinte est configurée, un lien par personne, retirable', () => {
+  const crypto = require('node:crypto');
+  const { standingAdminLink } = require('../lib/admin-links');
+  const me = crypto.randomBytes(32).toString('base64url'), partner = crypto.randomBytes(32).toString('base64url');
+  const hash = token => crypto.createHash('sha256').update(token).digest('hex');
+  const config = `moi:${hash(me)},associe:${hash(partner)}`;
+  assert.equal(standingAdminLink(me, config), 'moi');
+  assert.equal(standingAdminLink(partner, config), 'associe');
+  assert.equal(standingAdminLink(crypto.randomBytes(32).toString('base64url'), config), null);
+  assert.equal(standingAdminLink(partner, `moi:${hash(me)}`), null, 'lien retiré');
+  assert.equal(standingAdminLink(me, ''), null);
+  assert.equal(standingAdminLink('court', config), null);
+  assert.ok(!config.includes(me) && !config.includes(partner), 'aucun secret en clair dans la configuration');
+});

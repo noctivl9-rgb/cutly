@@ -29,10 +29,24 @@ $('#modify-form').addEventListener('submit',async event=>{event.preventDefault()
 $('#hours-day').addEventListener('change',showHoursDay);
 $('#hours-closed').addEventListener('change',()=>{$('#hours-opens').disabled=$('#hours-closes').disabled=$('#hours-closed').checked;});
 $('#hours-form').addEventListener('submit',async event=>{event.preventDefault();const weekday=Number($('#hours-day').value),current=weeklyHours.find(item=>item.weekday===weekday),closed=$('#hours-closed').checked,message=$('#hours-message');try{const result=await api(`/api/admin/hours/${weekday}`,{method:'PATCH',body:JSON.stringify({version:current.version,opens:closed?null:$('#hours-opens').value,closes:closed?null:$('#hours-closes').value})});weeklyHours=weeklyHours.map(item=>item.weekday===weekday?{...item,opens:result.opens,closes:result.closes,version:result.version}:item);message.textContent='Horaires enregistrés.';showHoursDay();}catch(error){if(error.message==='appointments_conflict'){const conflicts=error.payload?.appointments||[];message.textContent=`Modification refusée : ${conflicts.length} rendez-vous actif(s) sont concernés${conflicts.length?` (${conflicts.map(item=>new Date(item.startsAt).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).join(', ')})`:''}. Aucun rendez-vous n’a été modifié.`;}else if(error.message==='version_conflict')message.textContent='Les horaires ont été modifiés ailleurs. Rechargez la page avant de réessayer.';else message.textContent='Horaires non modifiés : '+error.message;}});
-logoutButton.addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST'});}finally{dashboardPanel.hidden=true;loginPanel.hidden=false;logoutButton.hidden=true;}});
+logoutButton.addEventListener('click',async()=>{try{try{localStorage.removeItem('cutly-admin-link');}catch{}await api('/api/auth/logout',{method:'POST'});}finally{dashboardPanel.hidden=true;loginPanel.hidden=false;logoutButton.hidden=true;}});
 $('#new-service-form').addEventListener('submit',async event=>{event.preventDefault();const form=new FormData(event.currentTarget),price=Number(form.get('price'));try{if(!Number.isFinite(price)||price<=0||!Number.isInteger(price*100))throw new Error('Saisissez un prix valide au centime.');await api('/api/admin/services',{method:'POST',body:JSON.stringify({name:form.get('name'),priceCents:Math.round(price*100),durationMinutes:Number(form.get('duration')),eligible:form.has('eligible')})});event.currentTarget.reset();$('#service-message').textContent='Prestation créée.';await Promise.all([loadServices(),loadDashboard()]);}catch(error){$('#service-message').textContent=error.message==='service_name_exists'?'Une prestation porte déjà ce nom.':'Création refusée : '+error.message;}});
-// Une session client (même navigateur que le site) ne donne pas accès à l’administration : on demande la connexion administrateur.
-api('/api/auth/session').then(session=>{if(session.user?.role!=='ESTABLISHMENT_ADMIN'){const note=document.querySelector('#login-form .admin-message');if(note)note.textContent=`Vous êtes connecté avec un compte client (${session.user?.email||''}). Connectez-vous ici avec le compte administrateur.`;return;}showAuthenticated();return Promise.all([loadDashboard(),loadHours(),loadServices()]);}).catch(()=>{});
+// Ouverture : session administrateur existante, sinon lien privé gardé sur cet appareil (admin-lien.js), sinon formulaire.
+// Une session client (même navigateur que le site) ne donne jamais accès à l'administration.
+async function openAdmin(){
+ let session=null;try{session=await api('/api/auth/session');}catch{}
+ if(session?.user?.role!=='ESTABLISHMENT_ADMIN'){
+  let token=null;try{token=localStorage.getItem('cutly-admin-link');}catch{}
+  if(token){try{await api('/api/auth/admin/link',{method:'POST',body:JSON.stringify({token})});session=await api('/api/auth/session');}catch{try{localStorage.removeItem('cutly-admin-link');}catch{}}}
+ }
+ if(session?.user?.role!=='ESTABLISHMENT_ADMIN'){
+  const note=document.querySelector('#login-form .admin-message');
+  if(note&&session?.user)note.textContent=`Vous êtes connecté avec un compte client (${session.user.email}). Connectez-vous ici avec le compte administrateur.`;
+  return;
+ }
+ showAuthenticated();await Promise.all([loadDashboard(),loadHours(),loadServices()]);
+}
+openAdmin().catch(()=>{});
 
 // E-mail de test : preuve d'envoi par le fournisseur réel (la réception se vérifie dans la boîte de l'administrateur).
 $('#email-test')?.addEventListener('click',async event=>{const button=event.currentTarget,message=$('#email-test-message');button.disabled=true;message.textContent='Envoi en cours…';

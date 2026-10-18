@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { createDatabase } = require('./lib/database');
-const { consumeAdminLink } = require('./lib/admin-links');
+const { consumeAdminLink, standingAdminLink } = require('./lib/admin-links');
 const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessionFromRequest, cookieHeader, logout, mfaKey } = require('./lib/auth');
 const { createBooking } = require('./lib/booking');
 const { getDayAvailability, getMonthAvailability } = require('./lib/availability');
@@ -352,7 +352,14 @@ const server=http.createServer(async(req,res)=>{
   // Lien privé administrateur (créé uniquement par la commande admin:link) : remplace mot de passe et code pendant sa validité.
   if(req.method==='POST'&&url.pathname==='/api/auth/admin/link'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});if(!await allowPublicAttempt(`admin-link:${clientAddress(req)}`,20,15*60*1000))return json(res,429,{error:'too_many_attempts'});
-   const body=await readBody(req),key=mfaKey();const userId=key?await consumeAdminLink(db,{token:body.token,key}):null;if(!userId)return json(res,401,{error:'invalid_link'});
+   const body=await readBody(req),key=mfaKey();let userId=key?await consumeAdminLink(db,{token:body.token,key}):null;
+   // Lien permanent (CUTLY_ADMIN_LINKS) : ouvre la session de l'administrateur de Thomas Shop, journalisée avec le nom du lien.
+   const label=userId?null:standingAdminLink(body.token);
+   if(label){
+    const admin=await db.prepare("SELECT u.id FROM users u JOIN establishment_members m ON m.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 ORDER BY u.created_at LIMIT 1").get();
+    if(admin){userId=admin.id;await db.prepare("INSERT INTO audit_events(id,actor_id,action,object_type,object_id,reason,result,created_at) VALUES(?,?,'ADMIN_STANDING_LINK_LOGIN','USER',?,?,'SUCCESS',?)").run(crypto.randomUUID(),admin.id,admin.id,`Lien permanent : ${label}`,new Date().toISOString());}
+   }
+   if(!userId)return json(res,401,{error:'invalid_link'});
    const session=await createSession(db,userId,req.headers['user-agent']);return json(res,200,{expiresAt:session.expiresAt},{'set-cookie':cookieHeader(session.token)});
   }
   if(req.method==='GET'&&url.pathname==='/api/auth/session'){
