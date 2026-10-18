@@ -162,6 +162,21 @@
   }
   async function loyalty() {
     const data = await api('/api/client/loyalty'), rewards = document.querySelector('#account-rewards'), ledger = document.querySelector('#loyalty-ledger');
+    // Dix cachets : progression du cycle en cours, calculée par le serveur à partir du registre de points.
+    const meter = document.querySelector('#loyalty-meter');
+    if (meter && data.progress) {
+      const { points, goal } = data.progress;
+      const count = el('p', undefined, 'loyalty-count'); count.append(el('strong', String(points)), el('span', `/ ${goal}`));
+      const stamps = el('div', undefined, 'loyalty-stamps');
+      for (let index = 1; index <= goal; index++) {
+        const stamp = el('span', index === goal ? '★' : String(index), index <= points ? 'is-earned' : index === goal ? 'is-reward' : '');
+        stamp.style.setProperty('--i', index); stamps.append(stamp);
+      }
+      const left = goal - points;
+      const note = el('p', left > 0 ? `Encore ${left} prestation${left > 1 ? 's' : ''} éligible${left > 1 ? 's' : ''} terminée${left > 1 ? 's' : ''} et payée${left > 1 ? 's' : ''} avant votre Coupe classique offerte.` : 'Votre Coupe classique offerte est débloquée.', 'loyalty-note');
+      stamps.setAttribute('role', 'img'); stamps.setAttribute('aria-label', `${points} prestation${points > 1 ? 's' : ''} éligible${points > 1 ? 's' : ''} sur ${goal}`);
+      meter.append(count, stamps, note); meter.hidden = false;
+    }
     if (!data.rewards.length) rewards.append(el('p', 'Aucune récompense pour le moment.', 'muted'));
     const rewardLabels = { AVAILABLE: 'Disponible', RESERVED: 'Réservée pour un rendez-vous', USED: 'Utilisée', CANCELLED: 'Annulée', REVIEW_REQUIRED: 'En cours d’examen' };
     for (const reward of data.rewards) {

@@ -5,9 +5,9 @@
    (prix, horaires, boutons, formulaires, statuts). Polices auto-hébergées (OFL).
    Surfaces : listes à filets plutôt que cartes ; rayons 10–12 px ; aucune ombre portée.
    ========================================================================== */
-@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Italic.ttf") format("truetype");font-weight:400;font-style:italic;font-display:swap}
-@font-face{font-family:"Inter";src:url("/fonts/Inter-Variable.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Regular.woff2") format("woff2"),url("/fonts/InstrumentSerif-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Instrument Serif";src:url("/fonts/InstrumentSerif-Italic.woff2") format("woff2"),url("/fonts/InstrumentSerif-Italic.ttf") format("truetype");font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:"Inter";src:url("/fonts/Inter-Variable.woff2") format("woff2"),url("/fonts/Inter-Variable.ttf") format("truetype");font-weight:100 900;font-style:normal;font-display:swap}
 
 :root{
   color-scheme:light;
