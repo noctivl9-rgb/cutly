@@ -308,7 +308,7 @@ const server=http.createServer(async(req,res)=>{
      text:`Bonjour,\n\nCet e-mail de test a été envoyé par CUTLY le ${sentAt} (heure de Paris).\nS’il vous parvient, l’envoi des e-mails fonctionne.\n\nCUTLY — Thomas Shop`,
      html:`<p>Bonjour,</p><p>Cet e-mail de test a été envoyé par CUTLY le ${escapeHtml(sentAt)} (heure de Paris).</p><p>S’il vous parvient, l’envoi des e-mails fonctionne.</p><p>CUTLY — Thomas Shop</p>`});
     return json(res,200,{status:'ACCEPTED',provider:receipt.provider,messageId:receipt.id,to:admin.email.replace(/^(.).*(@.*)$/,'$1•••$2')});
-   }catch(error){return json(res,error.status&&error.status>=400?error.status:502,{error:error.code||'email_failed',configuration:Boolean(error.configuration)});}
+   }catch(error){console.error('CUTLY email-test:',error.code,error.providerStatus||'',error.providerMessage||'');return json(res,error.status&&error.status>=400?error.status:502,{error:error.code||'email_failed',configuration:Boolean(error.configuration),provider:process.env.CUTLY_EMAIL_PROVIDER||'resend',providerStatus:error.providerStatus||null,providerMessage:error.providerMessage||null});}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/register'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
