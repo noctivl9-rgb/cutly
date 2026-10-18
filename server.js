@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { createDatabase } = require('./lib/database');
+const { consumeAdminLink } = require('./lib/admin-links');
 const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessionFromRequest, cookieHeader, logout, mfaKey } = require('./lib/auth');
 const { createBooking } = require('./lib/booking');
 const { getDayAvailability, getMonthAvailability } = require('./lib/availability');
@@ -202,6 +203,7 @@ const migrations=[
   bootstrapDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS outbox_dedupe_uq ON notification_outbox(dedupe_key) WHERE dedupe_key IS NOT NULL; CREATE INDEX IF NOT EXISTS outbox_provider_msg_idx ON notification_outbox(provider_message_id)');
   bootstrapDb.exec('CREATE TABLE IF NOT EXISTS notification_events(id TEXT PRIMARY KEY,outbox_id TEXT REFERENCES notification_outbox(id),provider_event_id TEXT NOT NULL UNIQUE,provider_message_id TEXT,type TEXT NOT NULL,occurred_at TEXT NOT NULL,received_at TEXT NOT NULL,detail TEXT); CREATE INDEX IF NOT EXISTS notification_events_outbox_idx ON notification_events(outbox_id); CREATE TABLE IF NOT EXISTS email_suppressions(email TEXT PRIMARY KEY,reason TEXT NOT NULL,created_at TEXT NOT NULL)');
  }},
+ {version:9,name:'admin-login-links',up:()=>bootstrapDb.exec('CREATE TABLE IF NOT EXISTS admin_login_links(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,expires_at TEXT NOT NULL,revoked_at TEXT,last_used_at TEXT,uses INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS admin_login_links_user_idx ON admin_login_links(user_id)')},
  {version:7,name:'shared-rate-limits',up:()=>bootstrapDb.exec('CREATE TABLE IF NOT EXISTS rate_limits(key_hash TEXT PRIMARY KEY,attempts INTEGER NOT NULL,expires_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS rate_limits_expiry_idx ON rate_limits(expires_at);')}
 ];
 for(const migration of migrations){
@@ -227,9 +229,9 @@ for (let day=0; day<7; day++) seedHours.run(shop.id,day,(day===0||day===6)?'09:0
 }
 
 // Latest version recorded by db/postgres/schema.sql (and the Netlify Database migration copy).
-const POSTGRES_SCHEMA_VERSION=8;
+const POSTGRES_SCHEMA_VERSION=9;
 // Updates applied after schema.sql (version 7) : [version, file]. Netlify Database applies the same files as migrations.
-const POSTGRES_UPDATES=[[8,'db/postgres/updates/0002_notification_tracking.sql']];
+const POSTGRES_UPDATES=[[8,'db/postgres/updates/0002_notification_tracking.sql'],[9,'db/postgres/updates/0003_admin_login_links.sql']];
 async function initializePostgres(){
  if(db.kind!=='POSTGRES')return;
  const schema=fs.readFileSync(path.join(ROOT,'db/postgres/schema.sql'),'utf8');
@@ -331,6 +333,12 @@ const server=http.createServer(async(req,res)=>{
     const valid=user&&user.role==='ESTABLISHMENT_ADMIN'&&!user.disabled_at&&mfa?.enabled===1&&member&&await verifyPassword(String(body.password||''),user.password_hash)&&await verifyAndConsumeTotp(db,user.id,body.otp);
    if(!valid){const current=loginAttempts.get(key);loginAttempts.set(key,{count:(current&&current.until>now?current.count:0)+1,until:current&&current.until>now?current.until:now+windowMs});return json(res,401,{error:'invalid_credentials'});}
     loginAttempts.delete(key);const session=await createSession(db,user.id,req.headers['user-agent']);return json(res,200,{user:{email:user.email,role:user.role},expiresAt:session.expiresAt},{'set-cookie':cookieHeader(session.token)});
+  }
+  // Lien privé administrateur (créé uniquement par la commande admin:link) : remplace mot de passe et code pendant sa validité.
+  if(req.method==='POST'&&url.pathname==='/api/auth/admin/link'){
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});if(!await allowPublicAttempt(`admin-link:${clientAddress(req)}`,20,15*60*1000))return json(res,429,{error:'too_many_attempts'});
+   const body=await readBody(req),key=mfaKey();const userId=key?await consumeAdminLink(db,{token:body.token,key}):null;if(!userId)return json(res,401,{error:'invalid_link'});
+   const session=await createSession(db,userId,req.headers['user-agent']);return json(res,200,{expiresAt:session.expiresAt},{'set-cookie':cookieHeader(session.token)});
   }
   if(req.method==='GET'&&url.pathname==='/api/auth/session'){
     const session=await sessionFor(req);if(!session)return json(res,401,{error:'authentication_required'});
