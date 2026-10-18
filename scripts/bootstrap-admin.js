@@ -32,5 +32,23 @@ async function main() {
  } finally { await db.close(); }
 }
 
+// Premier démarrage sur un nouvel hébergeur (Render) : si CUTLY_BOOTSTRAP_ADMIN_EMAIL est défini et qu'aucun administrateur
+// n'existe, il est créé avec un mot de passe et une double vérification aléatoires, jamais affichés.
+// L'accès se fait par les liens privés permanents (CUTLY_ADMIN_LINKS) ; mot de passe et code se redéfinissent avec reset-admin.
+async function ensureAdministrator(db, { email = process.env.CUTLY_BOOTSTRAP_ADMIN_EMAIL, key = mfaKey() } = {}) {
+ email = email?.trim().toLowerCase();
+ if (!email || !key || !/^\S+@\S+\.\S+$/.test(email)) return false;
+ return withTransaction(db, async tx => {
+  await tx.lock?.('first-administrator-bootstrap');
+  if (await tx.prepare("SELECT 1 FROM users WHERE role IN ('ESTABLISHMENT_ADMIN','PLATFORM_ADMIN') LIMIT 1").get()) return false;
+  if (!await tx.prepare("SELECT 1 FROM establishments WHERE id='thomas-shop'").get()) return false;
+  const id = crypto.randomUUID(), now = new Date().toISOString();
+  await tx.prepare(`INSERT INTO users(id,email,first_name,last_name,password_hash,role,created_at,updated_at) VALUES(?,?, 'Thomas','Shop',?,'ESTABLISHMENT_ADMIN',?,?)`).run(id, email, await hashPassword(crypto.randomBytes(32).toString('base64url')), now, now);
+  await tx.prepare("INSERT INTO establishment_members(user_id,establishment_id,role,active) VALUES(?,'thomas-shop','ESTABLISHMENT_ADMIN',1)").run(id);
+  await tx.prepare('INSERT INTO admin_mfa(user_id,secret_encrypted,enabled,last_used_step,created_at) VALUES(?,?,1,-1,?)').run(id, encryptTotpSecret(encodeBase32(crypto.randomBytes(20)), key), now);
+  return true;
+ });
+}
+
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { main };
+module.exports = { main, ensureAdministrator };

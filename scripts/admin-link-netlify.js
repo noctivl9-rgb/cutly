@@ -6,7 +6,7 @@ const readline = require('node:readline');
 const { createDatabase } = require('../lib/database');
 const { createAdminLink, revokeAdminLinks } = require('../lib/admin-links');
 
-const SITE = 'https://cutlyt.netlify.app';
+const SITE = process.env.CUTLY_PUBLIC_BASE_URL || 'https://cutlyt.netlify.app';
 
 function ask(question, { hidden = false } = {}) {
   return new Promise(resolve => {

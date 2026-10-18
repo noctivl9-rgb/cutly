@@ -1,28 +1,35 @@
+# CUTLY sur Render (offre gratuite) : le serveur Node tel quel, base PostgreSQL externe (Neon, offre gratuite).
+# Créer : Render → New → Blueprint → choisir ce dépôt. Renseigner ensuite les valeurs marquées « sync: false ».
 services:
   - type: web
-    name: cutly-thomas-shop
+    name: cutly
     runtime: node
     plan: free
     region: frankfurt
-    numInstances: 1
-    autoDeployTrigger: 'off'
-    buildCommand: npm run build && npm test
-    startCommand: npm start
+    branch: cutly/refonte-design-v8
+    buildCommand: npm ci && npm run check
+    startCommand: node server.js
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
-      - key: CUTLY_HOST
-        value: 0.0.0.0
+      - key: CUTLY_TRUST_PROXY
+        value: "1"
+      - key: CUTLY_EMAIL_PROVIDER
+        value: brevo
+      # Clé de chiffrement de la double vérification : générée une fois par Render, à ne jamais changer ensuite.
+      - key: CUTLY_MFA_ENCRYPTION_KEY
+        generateValue: true
+      # Chaîne de connexion PostgreSQL (Neon → Connection string, avec ?sslmode=require).
       - key: CUTLY_DATABASE_URL
         sync: false
-      - key: CUTLY_PUBLIC_BASE_URL
+      # Administrateur créé automatiquement au premier démarrage s'il n'existe pas.
+      - key: CUTLY_BOOTSTRAP_ADMIN_EMAIL
         sync: false
-      - key: CUTLY_MFA_ENCRYPTION_KEY
+      # Empreintes des liens privés permanents (« moi:…,associe:… »).
+      - key: CUTLY_ADMIN_LINKS
         sync: false
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
         sync: false
       - key: CUTLY_EMAIL_FROM
-        sync: false
-      - key: CUTLY_JOB_TOKEN
         sync: false

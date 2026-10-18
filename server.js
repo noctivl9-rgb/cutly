@@ -26,6 +26,8 @@ function assertProductionConfiguration(){
  try{publicBaseUrl();}catch{throw new Error('Production requires a valid HTTPS CUTLY_PUBLIC_BASE_URL.');}
  if(!(process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or DATABASE_URL for PostgreSQL.');
 }
+// Render fournit l'adresse publique du service : elle sert d'adresse des liens si CUTLY_PUBLIC_BASE_URL n'est pas définie.
+if(!process.env.CUTLY_PUBLIC_BASE_URL&&process.env.RENDER_EXTERNAL_URL)process.env.CUTLY_PUBLIC_BASE_URL=process.env.RENDER_EXTERNAL_URL;
 if(process.env.NODE_ENV==='production'||process.env.NETLIFY==='true')assertProductionConfiguration();
 
 const ROOT = __dirname;
@@ -262,7 +264,8 @@ function readBody(req){return new Promise((resolve,reject)=>{let raw='';req.on('
 const loginAttempts=new Map();
 const dummyPasswordHash=hashPassword('CUTLY-unknown-account-password');
 // Behind the Netlify function relay every request comes from 127.0.0.1: use the visitor address the relay forwards.
-function clientAddress(req){const local=req.socket.remoteAddress;if(process.env.CUTLY_BEHIND_FUNCTION_PROXY==='1'&&(local==='127.0.0.1'||local==='::ffff:127.0.0.1')&&typeof req.headers['x-cutly-client-ip']==='string')return req.headers['x-cutly-client-ip'].slice(0,64);return local||'unknown';}
+// Behind a hosting proxy (Render: CUTLY_TRUST_PROXY=1), the visitor is the first address of X-Forwarded-For.
+function clientAddress(req){const local=req.socket.remoteAddress;if(process.env.CUTLY_TRUST_PROXY==='1'&&typeof req.headers['x-forwarded-for']==='string'){const first=req.headers['x-forwarded-for'].split(',')[0].trim();if(first)return first.slice(0,64);}if(process.env.CUTLY_BEHIND_FUNCTION_PROXY==='1'&&(local==='127.0.0.1'||local==='::ffff:127.0.0.1')&&typeof req.headers['x-cutly-client-ip']==='string')return req.headers['x-cutly-client-ip'].slice(0,64);return local||'unknown';}
 function rateLimitKey(req,email){return `${clientAddress(req)}:${String(email||'').trim().toLowerCase().slice(0,254)}`;}
 function allowPublicAttempt(key,limit=5,windowMs=15*60*1000){return consumeAttempt(db,key,limit,windowMs);}
 function checkSameOrigin(req){const origin=req.headers.origin;if(!origin)return process.env.NODE_ENV!=='production';try{return new URL(origin).host===req.headers.host;}catch{return false;}}
@@ -547,7 +550,8 @@ const port=Number(process.env.PORT||3000);
 const host=process.env.CUTLY_HOST||(process.env.NODE_ENV==='production'?'0.0.0.0':'127.0.0.1');
 const databaseReady=initializePostgres();
 if(require.main===module){
- databaseReady.then(()=>{
+ databaseReady.then(async()=>{
+  if(process.env.CUTLY_BOOTSTRAP_ADMIN_EMAIL&&await require('./scripts/bootstrap-admin').ensureAdministrator(db))console.log('CUTLY: administrateur initial créé (accès par lien privé).');
   server.listen(port,host,()=>console.log(`CUTLY listening on ${host}:${server.address().port}`));
   if(emailConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),Math.max(500,Number(process.env.CUTLY_OUTBOX_INTERVAL_MS)||15_000));worker.unref();}
  }).catch(async error=>{console.error('CUTLY database initialization failed',error.code||'database_error');await db.close().catch(()=>{});process.exitCode=1;});
