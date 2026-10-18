@@ -57,9 +57,31 @@
     if (glass) glassLight(glass);
     const nav = bar.querySelector('.topbar-links');
     if (nav) indicator(nav);
-    let scrolled = null;
-    const update = () => { const now = scrollY > 12; if (now !== scrolled) { scrolled = now; bar.toggleAttribute('data-scrolled', now); } };
-    addEventListener('scroll', update, { passive: true });
+    let scrolled = null, tone = null, pending = false;
+    // Teinte du verre : on regarde ce qui passe juste sous la barre (premier fond opaque, ou data-bar-tone).
+    const toneBelow = () => {
+      const y = bar.getBoundingClientRect().bottom + 2;
+      let node = document.elementFromPoint(innerWidth / 2, Math.min(y, innerHeight - 1));
+      while (node && node !== document.documentElement) {
+        if (node.dataset?.barTone) return node.dataset.barTone;
+        const color = getComputedStyle(node).backgroundColor.match(/[\d.]+/g);
+        if (color && (color.length < 4 || Number(color[3]) > 0.5)) {
+          const [r, g, b] = color.map(Number);
+          return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.45 ? 'dark' : 'light';
+        }
+        node = node.parentElement;
+      }
+      return 'light';
+    };
+    const update = () => {
+      pending = false;
+      const now = scrollY > 12;
+      if (now !== scrolled) { scrolled = now; bar.toggleAttribute('data-scrolled', now); }
+      const next = toneBelow();
+      if (next !== tone) { tone = next; bar.dataset.tone = next; }
+    };
+    addEventListener('scroll', () => { if (!pending) { pending = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener('resize', update);
     update();
     return true;
   }

@@ -187,3 +187,16 @@ test('suivi du fournisseur : webhook signé accepté, falsifié refusé, rejeu i
   expect(list.notifications.find(item => item.id === row.id).providerStatus).toBe('DELIVERED');
   expect(JSON.stringify(list)).not.toMatch(/sarah\.e2e|payload|verifyEmail/);
 });
+
+test('e-mail de test depuis l’administration : envoyé à l’administrateur, refusé sans session', async ({ playwright }) => {
+  const anonymous = await playwright.request.newContext({ baseURL: BASE, extraHTTPHeaders: { origin: BASE } });
+  expect((await anonymous.post('/api/admin/email-test', { data: {} })).status()).toBe(401);
+  const before = readMails().length;
+  const response = await adminRequest.post('/api/admin/email-test', { data: {} });
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body).toMatchObject({ status: 'ACCEPTED', provider: 'file-test' });
+  expect(body.to).not.toContain(ADMIN.email);
+  const mail = await waitForMail(ADMIN.email, 'Test d’envoi — CUTLY', { since: before });
+  expect(mail.text).toMatch(/l’envoi des e-mails fonctionne/);
+});

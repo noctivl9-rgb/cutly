@@ -53,7 +53,7 @@ test('verre et planches : barre présente partout, photographie décorative, pet
   for (const path of ['/services.html', '/shop.html', '/slots.html', '/account.html']) {
     await page.goto(path);
     await expect(page.locator('.topbar-glass')).toBeVisible();
-    if (path !== '/slots.html' || await page.locator('.scene').count()) await expect(page.locator('.scene')).toHaveAttribute('aria-hidden', 'true');
+    if (await page.locator('.scene').count()) await expect(page.locator('.scene')).toHaveAttribute('aria-hidden', 'true');
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${path} à 320 px`).toBeLessThanOrEqual(0);
     // La barre ne recouvre pas le titre de la page.
     const [bar, title] = await Promise.all([page.locator('.topbar').boundingBox(), page.locator('main h1').first().boundingBox()]);

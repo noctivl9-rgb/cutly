@@ -8,7 +8,7 @@ const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessi
 const { createBooking } = require('./lib/booking');
 const { getDayAvailability, getMonthAvailability } = require('./lib/availability');
 const { registerClient, resendClientVerification, verifyEmail, requestPasswordReset, resetClientPassword } = require('./lib/accounts');
-const { emailConfigured, publicBaseUrl, providerStatus } = require('./lib/providers');
+const { emailConfigured, publicBaseUrl, providerStatus, sendEmail, escapeHtml } = require('./lib/providers');
 const { transitionAppointment, modifyAppointment } = require('./lib/appointments');
 const { recordOnsitePayment, correctOnsitePayment } = require('./lib/payments');
 const { submitReview, decideReview } = require('./lib/reviews');
@@ -21,7 +21,7 @@ const { withTransaction } = require('./lib/database');
 
 function assertProductionConfiguration(){
  if(!mfaKey())throw new Error('Production requires CUTLY_MFA_ENCRYPTION_KEY (base64-encoded 32-byte key).');
- if(!emailConfigured())throw new Error('Production requires RESEND_API_KEY and CUTLY_EMAIL_FROM.');
+ if(!emailConfigured())throw new Error('Production requires a configured email provider and CUTLY_EMAIL_FROM.');
 
  try{publicBaseUrl();}catch{throw new Error('Production requires a valid HTTPS CUTLY_PUBLIC_BASE_URL.');}
  if(!(process.env.CUTLY_DATABASE_URL||process.env.DATABASE_URL||process.env.NETLIFY_DB_URL))throw new Error('Production requires CUTLY_DATABASE_URL or DATABASE_URL for PostgreSQL.');
@@ -295,6 +295,21 @@ const server=http.createServer(async(req,res)=>{
    const rows=await db.prepare("SELECT id,appointment_id AS appointmentId,channel,kind,status,provider_name AS provider,provider_status AS providerStatus,attempts,last_error AS lastError,created_at AS createdAt,sent_at AS sentAt FROM notification_outbox ORDER BY created_at DESC LIMIT 100").all();
    return json(res,200,{notifications:rows,provider:providerStatus().email});
   }
+  // E-mail de test (administrateur) : envoie un message réel, par le fournisseur configuré, à l'adresse de l'administrateur connecté.
+  // Renvoie le reçu du fournisseur (« accepté ») ; la réception se constate dans la boîte de l'administrateur.
+  if(req.method==='POST'&&url.pathname==='/api/admin/email-test'){
+   if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});
+   const session=await sessionFor(req);if(!session||session.role!=='ESTABLISHMENT_ADMIN')return json(res,401,{error:'authentication_required'});
+   if(!await consumeAttempt(db,`email-test:${session.user_id}`,5,60*60*1000))return json(res,429,{error:'too_many_attempts'});
+   const admin=await db.prepare('SELECT email FROM users WHERE id=?').get(session.user_id);
+   const sentAt=new Date().toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'long',timeStyle:'medium'});
+   try{
+    const receipt=await sendEmail({to:admin.email,subject:'Test d’envoi — CUTLY',idempotencyKey:`email-test-${crypto.randomUUID()}`,tags:[{name:'category',value:'test'}],
+     text:`Bonjour,\n\nCet e-mail de test a été envoyé par CUTLY le ${sentAt} (heure de Paris).\nS’il vous parvient, l’envoi des e-mails fonctionne.\n\nCUTLY — Thomas Shop`,
+     html:`<p>Bonjour,</p><p>Cet e-mail de test a été envoyé par CUTLY le ${escapeHtml(sentAt)} (heure de Paris).</p><p>S’il vous parvient, l’envoi des e-mails fonctionne.</p><p>CUTLY — Thomas Shop</p>`});
+    return json(res,200,{status:'ACCEPTED',provider:receipt.provider,messageId:receipt.id,to:admin.email.replace(/^(.).*(@.*)$/,'$1•••$2')});
+   }catch(error){return json(res,error.status&&error.status>=400?error.status:502,{error:error.code||'email_failed',configuration:Boolean(error.configuration)});}
+  }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/register'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
     if(!await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get())return json(res,503,{error:'administrator_not_initialized'});
@@ -514,7 +529,8 @@ const server=http.createServer(async(req,res)=>{
    try{const booking=await createBooking(db,{userId:session.user_id,serviceId:body.serviceId,date:body.date,time:body.time,idempotencyKey:body.idempotencyKey,rewardId:body.rewardId||null,expectedPriceCents:body.expectedPriceCents,expectedDurationMinutes:body.expectedDurationMinutes});return json(res,201,{booking,message:'Votre demande de réservation a bien été envoyée. Elle sera confirmée après validation par Thomas.'});}catch(error){if(error.code==='slot_unavailable')return json(res,409,{error:error.code,message:'Ce créneau vient d’être réservé. Merci de sélectionner un autre horaire.'});return adminFailure(res,error);}
   }
   if(req.method==='GET'&&url.pathname.startsWith('/api/')) return json(res,404,{error:'not_found'});
-  const target=url.pathname==='/'?'/index.html':url.pathname;
+  // /admin (et /admin/) : même page qu’en production (Netlify sert admin.html à cette adresse).
+  const target=url.pathname==='/'?'/index.html':/^\/admin\/?$/.test(url.pathname)?'/admin.html':url.pathname;
   const filename=path.resolve(ROOT,'public',`.${target}`);
   if(!filename.startsWith(path.resolve(ROOT,'public')+path.sep))return json(res,404,{error:'not_found'});
   fs.readFile(filename,(err,data)=>{if(err){res.writeHead(404,SECURITY_HEADERS);res.end('Not found');return;}res.writeHead(200,{'content-type':MIME[path.extname(filename)]||'application/octet-stream',...SECURITY_HEADERS});res.end(data);});
