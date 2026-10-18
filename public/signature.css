@@ -17,8 +17,10 @@ html,body{overflow-x:clip}
 body:not([data-page=home]){background:var(--paper-warm)}
 
 /* ---------- Planche photographique ---------- */
-.scene{position:relative;margin:0;overflow:hidden;background:var(--sky-wash);view-transition-name:cutly-scene}
-.scene img{display:block;width:100%;height:100%;object-fit:cover;transform:translate3d(0,var(--py,0),0) scale(var(--ps,1.08));transform-origin:50% 40%;will-change:transform}
+.scene{position:relative;margin:0;overflow:hidden;background:var(--sky-wash)}
+.scene img{display:block;width:100%;height:100%;object-fit:cover;transform-origin:50% 40%;animation:scene-in 1.4s var(--ease-out) both}
+/* La photographie s'approche une fois, au chargement (une seule animation, sur le compositeur) */
+@keyframes scene-in{from{opacity:0;transform:scale(1.07)}to{opacity:1;transform:scale(1)}}
 .scene::after{content:"";position:absolute;inset:0;pointer-events:none;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   mix-blend-mode:multiply;opacity:.9}
@@ -39,12 +41,13 @@ body[data-scene=mer] .scene img{object-position:60% 60%}
 body[data-scene=ciel] .scene img{object-position:62% 78%}
 
 /* Planche encadrée (tirage posé sur un fond coloré) : fidélité, rendez-vous, salon */
-body[data-scene-style=plate] .scene{display:grid;place-items:center;align-content:center;padding:calc(env(safe-area-inset-top) + 92px) 24px 64px;height:auto;background:var(--sand)}
-body[data-scene-style=plate] .scene img{width:min(100%,420px);height:auto;aspect-ratio:auto;box-shadow:0 1px 0 rgb(255 255 255/.6) inset,0 18px 40px -22px rgb(60 40 10/.55),0 0 0 8px #fffdf8,0 0 0 9px rgb(91 74 44/.15);transform:rotate(-1.2deg) translate3d(0,var(--py,0),0)}
+body[data-scene-style=plate] .scene{display:grid;place-items:center;align-content:center;padding:calc(env(safe-area-inset-top) + 136px) 24px 64px;height:auto;background:var(--sand)}
+body[data-scene-style=plate] .scene img{width:min(100%,420px);height:auto;aspect-ratio:auto;box-shadow:0 1px 0 rgb(255 255 255/.6) inset,0 18px 40px -22px rgb(60 40 10/.55),0 0 0 8px #fffdf8,0 0 0 9px rgb(91 74 44/.15);transform:rotate(-1.2deg);animation:plate-in 1s var(--ease-out) both}
+@keyframes plate-in{from{opacity:0;transform:rotate(-3deg) translateY(14px)}}
 body[data-scene-style=plate] .scene figcaption{position:static;margin-top:22px;text-align:center;justify-items:center;color:var(--sand-ink)}
 body[data-scene-style=plate] .scene::after{opacity:.5}
 body[data-scene=horizon] .scene{background:linear-gradient(180deg,#dcebf7,#f1f5f6)}
-body[data-scene=horizon] .scene img{width:min(100%,560px);transform:rotate(.8deg) translate3d(0,var(--py,0),0)}
+body[data-scene=horizon] .scene img{width:min(100%,560px);transform:rotate(.8deg)}
 body[data-scene=horizon] .scene figcaption{color:#2a4a66}
 body[data-scene=salon] .scene{background:#15170f;color:#efe9da}
 body[data-scene=salon] .scene figcaption{color:#e8dfca}
@@ -79,11 +82,9 @@ body:not([data-page=home]) h2{font-size:clamp(30px,7vw,40px);line-height:1;lette
 .eyebrow,.step-caption,.kicker{font-family:var(--font-pixel);font-size:11.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--sea)}
 .eyebrow{color:var(--ink-2)}
 /* Révélation par ligne (mots enveloppés par signature.js, texte inchangé pour les lecteurs d'écran) */
-.reveal-line{display:inline-block;overflow:hidden;vertical-align:top;padding:.16em 0 .08em;margin:-.16em 0 -.08em}
-.reveal-line>span{display:inline-block;transform:translateY(105%);transition:transform var(--dur-3) var(--ease-out) calc(var(--i,0) * 70ms)}
-.is-revealed .reveal-line>span{transform:none}
-[data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .7s var(--ease-out) var(--d,0s),transform .7s var(--ease-out) var(--d,0s)}
-[data-reveal].is-revealed{opacity:1;transform:none}
+/* Titres : une seule entrée au chargement, en CSS (jamais de texte qui reste caché) */
+body:not([data-page=home]) main .page-title{animation:title-in .9s var(--ease-out) both}
+@keyframes title-in{from{opacity:0;transform:translateY(18px);clip-path:inset(-30% -5% 100% -5%)}to{opacity:1;transform:none;clip-path:inset(-30% -5% -30% -5%)}}
 .page-enter>*{animation-duration:.5s}
 
 /* ---------- Boutons ---------- */
@@ -176,6 +177,7 @@ body:not([data-page=home]) .slots-intro .button{min-height:40px;padding:0 14px;f
 /* ---------- Le salon ---------- */
 .hours-row{padding:13px 0}
 .hours-row:not(.is-closed){font-weight:600;color:var(--ink-deep)}
+.hours-row.is-closed{color:var(--muted)}
 .hours-row.is-today{box-shadow:inset 3px 0 var(--sea);padding-left:12px}
 
 /* ---------- Espace client ---------- */
@@ -217,5 +219,4 @@ body:not([data-page=home]) .app-footer::after{font-family:var(--font-pixel);lett
 
 @media(prefers-reduced-motion:reduce){
   .scene img{transform:none!important}
-  .reveal-line>span,[data-reveal]{transform:none!important;opacity:1!important}
 }

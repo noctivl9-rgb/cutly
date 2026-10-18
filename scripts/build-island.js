@@ -1,4 +1,4 @@
-// Génère l'en-tête « Dynamic Island » commun à toutes les pages clientes (hors accueil React).
+// Génère la barre Liquid Glass et les planches photographiques de toutes les pages clientes (hors accueil React).
 // Usage : node scripts/build-island.js  — réécrit l'en-tête de chaque page de public/ de façon idempotente.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,23 +12,19 @@ const CONTEXT = {
   'cancellation.html': 'Informations', 'install.html': 'Installer CUTLY'
 };
 const LINKS = [['Prestations', '/services.html'], ['Le salon', '/shop.html'], ['Rendez-vous', '/appointments.html'], ['Fidélité', '/loyalty.html']];
-const PANEL_LINKS = [['Prestations', '/services.html'], ['Le salon et les avis', '/shop.html'], ['Fidélité', '/loyalty.html'], ['Conditions générales', '/terms.html']];
 const SECTION = { 'services.html': '/services.html', 'shop.html': '/shop.html', 'appointments.html': '/appointments.html', 'appointment.html': '/appointments.html', 'history.html': '/appointments.html', 'loyalty.html': '/loyalty.html' };
+const ACCOUNT_PAGES = new Set(['account.html', 'profile.html', 'settings.html']);
 
-function island(file) {
+// Barre Liquid Glass : logo, quatre rubriques, compte, « Réserver ». Même balisage sur l'accueil (hero/App.tsx).
+function topbar(file) {
   const current = SECTION[file];
   const links = LINKS.map(([label, href]) => `<a href="${href}"${href === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
-  const panelLinks = PANEL_LINKS.map(([label, href]) => `<a href="${href}">${label}</a>`).join('');
-  return `<header class="island" data-island><div class="island-shell"><div class="island-bar">`
-    + `<a class="island-logo" href="/" aria-label="CUTLY, accueil">CUTLY</a>`
-    + `<nav class="island-links" aria-label="Navigation principale">${links}</nav>`
-    + `<a class="island-account" href="/profile.html" aria-label="Mon profil"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></a>`
-    + `<a class="island-cta" href="/booking.html">Réserver</a>`
-    + `<button class="island-toggle" type="button" data-island-toggle aria-expanded="false" aria-controls="island-panel">${CONTEXT[file]}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>`
-    + `</div><div class="island-panel" id="island-panel"><div><div class="island-panel-inner">`
-    + `<p class="island-shop">Thomas Shop</p><p class="island-status" data-island-status role="status"></p><p class="island-meta">8 cours de l’Île Seguin, Boulogne-Billancourt</p>`
-    + `<nav class="island-panel-links" aria-label="Liens secondaires">${panelLinks}</nav>`
-    + `</div></div></div></div></header>`;
+  return `<header class="topbar" data-topbar><div class="topbar-glass">`
+    + `<a class="topbar-logo" href="/" aria-label="CUTLY, accueil">CUTLY</a>`
+    + `<nav class="topbar-links" aria-label="Navigation principale">${links}</nav>`
+    + `<a class="topbar-account" href="/profile.html" aria-label="Mon profil"${ACCOUNT_PAGES.has(file) ? ' aria-current="page"' : ''}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></a>`
+    + `<a class="topbar-cta" href="/booking.html">Réserver</a>`
+    + `</div></header>`;
 }
 
 // Planches photographiques (signature.css) : un cadrage de la plage de l'accueil par rubrique.
@@ -62,6 +58,8 @@ function scene(file) {
   return `<figure class="scene" aria-hidden="true">${media}<span class="scene-fade"></span>`
     + `<figcaption><span class="scene-plate">${config.plate}</span><span class="scene-name">${config.name}</span></figcaption></figure>`;
 }
+// Polices des titres et du texte préchargées : évite le saut de police au chargement.
+const PRELOAD = '<link rel="preload" href="/fonts/InstrumentSerif-Regular.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/fonts/Inter-Variable.woff2" as="font" type="font/woff2" crossorigin>';
 const STYLES = '<link rel="stylesheet" href="/glass.css"><link rel="stylesheet" href="/signature.css">';
 
 let changed = 0;
@@ -69,11 +67,12 @@ for (const file of Object.keys(CONTEXT)) {
   const target = path.join(PUBLIC, file);
   let html = fs.readFileSync(target, 'utf8');
   const before = html;
-  html = html.replace(/<header class="(?:app-header|island)"[\s\S]*?<\/header>/, island(file));
-  if (!html.includes('src="/island.js"')) html = html.replace('</head>', '<script src="/island.js" defer></script></head>');
+  html = html.replace(/<header class="(?:app-header|island|topbar)"[\s\S]*?<\/header>/, topbar(file));
+  // Une seule navigation, en haut : plus de barre d'onglets ni de script d'île.
+  html = html.replace(/<nav class="bottom-nav"[\s\S]*?<\/nav>/, '').replace('<script src="/island.js" defer></script>', '');
   // Feuilles signature : toujours en dernier, pour primer sur les feuilles propres à chaque page.
-  html = html.replace(/<link rel="stylesheet" href="\/(?:glass|signature)\.css">|<script src="\/signature\.js" defer><\/script>/g, '')
-    .replace('</head>', `${STYLES}<script src="/signature.js" defer></script></head>`);
+  html = html.replace(/<link rel="stylesheet" href="\/(?:glass|signature)\.css">|<script src="\/signature\.js" defer><\/script>|<link rel="preload" href="\/fonts\/[^"]+\.woff2" as="font" type="font\/woff2" crossorigin>/g, '')
+    .replace('</head>', `${PRELOAD}${STYLES}<script src="/signature.js" defer></script></head>`);
   html = html.replace(/<figure class="scene"[\s\S]*?<\/figure>/, '').replace(/ data-scene(?:-style)?="[^"]*"/g, '');
   if (SCENES[file]) {
     html = html.replace(/<body([^>]*)>/, `<body$1 data-scene="${SCENES[file].scene}" data-scene-style="${SCENES[file].style}">`);
@@ -86,6 +85,7 @@ const home = path.join(PUBLIC, 'index.html');
 let homeHtml = fs.readFileSync(home, 'utf8');
 const homeBefore = homeHtml;
 if (!homeHtml.includes('href="/glass.css"')) homeHtml = homeHtml.replace('<link rel="stylesheet" href="/mobile-app.css">', '<link rel="stylesheet" href="/mobile-app.css"><link rel="stylesheet" href="/glass.css">');
+homeHtml = homeHtml.replace('<script src="/island.js" defer></script>', '').replace(/<nav class="bottom-nav"[\s\S]*?<\/nav>/, '');
 if (!homeHtml.includes('src="/signature.js"')) homeHtml = homeHtml.replace('</head>', '<script src="/signature.js" defer></script></head>');
 if (homeHtml !== homeBefore) { fs.writeFileSync(home, homeHtml); changed++; }
-console.log(`Île et planches installées ou mises à jour sur ${changed} page(s).`);
+console.log(`Barre de verre et planches installées ou mises à jour sur ${changed} page(s).`);

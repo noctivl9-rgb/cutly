@@ -55,9 +55,9 @@ test('accueil : île CUTLY et action de réservation évidente', async ({ page }
   await expect(install).toBeVisible();
   await page.getByRole('button', { name: 'Fermer le guide d’installation' }).click();
   await expect(install).toBeHidden();
-  await expect(page.locator('.island-logo')).toHaveText('CUTLY');
+  await expect(page.locator('.topbar-logo')).toHaveText('CUTLY');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Coupe nette.');
-  const cta = testInfo.project.name === 'iphone' ? page.locator('.hero-cta-mobile .button') : page.locator('.island-cta');
+  const cta = testInfo.project.name === 'iphone' ? page.locator('.hero-cta-mobile .button') : page.locator('.topbar-cta');
   await expect(cta).toBeVisible();
   await cta.click();
   await expect(page).toHaveURL(/\/booking\.html$/);
@@ -117,22 +117,20 @@ test('Conditions générales ouvertes depuis le récapitulatif, retour sans pert
   await expect(page.locator('#recap')).toContainText('Contours');
 });
 
-test('navigation : île (iPhone) et barre d’onglets', async ({ page, context }, testInfo) => {
+test('navigation : une seule barre de verre en haut, complète sur iPhone comme sur ordinateur', async ({ page, context }) => {
   await context.addCookies([cookie(clientToken)]);
   await page.goto('/appointments.html');
-  if (testInfo.project.name === 'iphone') {
-    await expect(page.locator('.bottom-nav a[aria-current="page"]')).toHaveText('Rendez-vous');
-    const toggle = page.locator('[data-island-toggle]');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.locator('[data-island-status]')).toHaveText(/^(Ouvert|Fermé)/);
-    await expect(page.locator('.island-panel-links')).toContainText('Conditions générales');
-    await page.keyboard.press('Escape');
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  } else {
-    await expect(page.locator('.bottom-nav')).toBeHidden();
-    await expect(page.locator('.island-links a[aria-current="page"]')).toHaveText('Rendez-vous');
-  }
+  await expect(page.locator('.bottom-nav')).toHaveCount(0);
+  for (const name of ['Prestations', 'Le salon', 'Rendez-vous', 'Fidélité']) await expect(page.locator('.topbar-links').getByRole('link', { name })).toBeVisible();
+  await expect(page.locator('.topbar-links a[aria-current="page"]')).toHaveText('Rendez-vous');
+  await expect(page.getByRole('link', { name: 'Mon profil' })).toBeVisible();
+  await expect(page.locator('.topbar-cta')).toBeVisible();
+  // L'indicateur liquide est posé sous la rubrique active.
+  const [pill, active] = await Promise.all([page.locator('.nav-indicator').boundingBox(), page.locator('.topbar-links a[aria-current="page"]').boundingBox()]);
+  expect(Math.abs(pill.x - active.x)).toBeLessThan(2);
+  await page.locator('.topbar-links').getByRole('link', { name: 'Fidélité' }).click();
+  await expect(page).toHaveURL(/loyalty.html/);
+  await expect(page.locator('.topbar-links a[aria-current="page"]')).toHaveText('Fidélité');
 });
 
 test('déconnexion : la session est révoquée', async ({ page, context }) => {

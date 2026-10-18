@@ -4,6 +4,8 @@ import Manifesto from './Manifesto';
 
 const VIDEO_SRC = '/media/cutly-hero.mp4';
 const EASE = [0.16, 1, 0.3, 1] as const;
+// Durée d'apparition du téléphone : le texte commence juste après.
+const PHONE_REVEAL = 0.9;
 
 // Mode « reference » : textes d'origine de la maquette, utilisé uniquement pour les captures de comparaison (jamais publié).
 const REFERENCE = import.meta.env.MODE === 'reference';
@@ -91,36 +93,18 @@ function TypingMessages({ anchor }: { anchor: Anchor }) {
 
 function Navbar() {
   const links = COPY.links;
-  // Même « Dynamic Island » que les autres pages (styles et comportement : mobile-app.css et island.js).
-  const panelLinks = [['Prestations', '/services.html'], ['Le salon et les avis', '/shop.html'], ['Fidélité', '/loyalty.html'], ['Conditions générales', '/terms.html']];
+  // Même barre Liquid Glass que les autres pages (styles : glass.css ; indicateur : signature.js).
   return (
-    <header className="island" data-island>
-      <div className="island-shell">
-        <div className="island-bar">
-          <a className="island-logo" href="/" aria-label="CUTLY, accueil">{COPY.logo}</a>
-          <nav className="island-links" aria-label="Navigation principale">
-            {links.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
-          </nav>
-          <a className="island-account" href="/profile.html" aria-label="Mon profil">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></svg>
-          </a>
-          <a className="island-cta" href="/booking.html">{REFERENCE ? COPY.cta : 'Réserver'}</a>
-          <button className="island-toggle" type="button" data-island-toggle aria-expanded="false" aria-controls="island-panel">
-            Thomas Shop<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-          </button>
-        </div>
-        <div className="island-panel" id="island-panel">
-          <div>
-            <div className="island-panel-inner">
-              <p className="island-shop">Thomas Shop</p>
-              <p className="island-status" data-island-status role="status" />
-              <p className="island-meta">8 cours de l’Île Seguin, Boulogne-Billancourt</p>
-              <nav className="island-panel-links" aria-label="Liens secondaires">
-                {panelLinks.map(([label, href]) => <a key={href} href={href}>{label}</a>)}
-              </nav>
-            </div>
-          </div>
-        </div>
+    <header className="topbar" data-topbar>
+      <div className="topbar-glass">
+        <a className="topbar-logo" href="/" aria-label="CUTLY, accueil">{COPY.logo}</a>
+        <nav className="topbar-links" aria-label="Navigation principale">
+          {links.map(link => <a key={link.href} href={link.href}>{link.label}</a>)}
+        </nav>
+        <a className="topbar-account" href="/profile.html" aria-label="Mon profil">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></svg>
+        </a>
+        <a className="topbar-cta" href="/booking.html">{REFERENCE ? COPY.cta : 'Réserver'}</a>
       </div>
     </header>
   );
@@ -138,11 +122,16 @@ function Hero() {
   const textOpacity = useTransform(scrollYProgress, [0, 0.55], [1, reduce ? 1 : 0]);
   const blur = useTransform(scrollYProgress, [0, 0.55], [0, reduce ? 0 : 10]);
   const textFilter = useMotionTemplate`blur(${blur}px)`;
+  // Le texte attend que la vidéo (le Nokia) soit affichée ; sans vidéo après 2,5 s, il apparaît quand même.
+  const [phoneReady, setPhoneReady] = useState(false);
+  useEffect(() => { const timer = setTimeout(() => setPhoneReady(true), 2500); return () => clearTimeout(timer); }, []);
+  const textDelay = reduce ? 0 : PHONE_REVEAL;
 
   return (
-    <section ref={section} aria-labelledby="hero-title" className="relative min-h-screen bg-[#F3F4ED] pt-24 md:pt-32 flex flex-col items-center overflow-hidden">
-      <motion.div ref={frame} className="absolute inset-0 z-0 origin-center" style={{ scale: sceneScale }}>
-        <video className="absolute inset-0 w-full h-full object-cover" style={anchor ? { objectPosition: `${(anchor.objectPositionX * 100).toFixed(2)}% 50%` } : undefined} src={VIDEO_SRC} autoPlay loop muted playsInline preload="auto" aria-hidden="true" />
+    <section ref={section} aria-labelledby="hero-title" className="relative min-h-screen bg-[#F3F4ED] pt-36 md:pt-32 flex flex-col items-center overflow-hidden">
+      <motion.div ref={frame} className="absolute inset-0 z-0 origin-center" style={{ scale: sceneScale }}
+        initial={reduce ? false : { opacity: 0 }} animate={{ opacity: phoneReady ? 1 : 0 }} transition={{ duration: PHONE_REVEAL, ease: EASE }}>
+        <video className="absolute inset-0 w-full h-full object-cover" style={anchor ? { objectPosition: `${(anchor.objectPositionX * 100).toFixed(2)}% 50%` } : undefined} src={VIDEO_SRC} autoPlay loop muted playsInline preload="auto" aria-hidden="true" onLoadedData={() => setPhoneReady(true)} />
         <div className="absolute inset-0 bg-white/5" />
         <TypingMessages anchor={anchor} />
       </motion.div>
@@ -150,22 +139,22 @@ function Hero() {
       <motion.div className="relative z-20 pointer-events-none text-center px-5" style={{ y: textY, opacity: textOpacity, filter: textFilter }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.5, ease: EASE }}
+          animate={phoneReady ? { opacity: 1, scale: 1 } : undefined}
+          transition={{ duration: 1.5, delay: textDelay, ease: EASE }}
           className="font-instrument text-[38px] md:text-[56px] lg:text-[72px] leading-[0.85] tracking-tight text-[#1a1a1a] mb-6"
         >
           <h1 id="hero-title" className="font-instrument font-normal text-[38px] md:text-[56px] lg:text-[72px] leading-[0.85] tracking-tight text-[#1a1a1a] m-0">{COPY.title[0]} <br /> {COPY.title[1]}</h1>
         </motion.div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, delay: 0.3, ease: EASE }}
+          animate={phoneReady ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 1.2, delay: textDelay + 0.3, ease: EASE }}
           className="font-sans text-[16px] md:text-[18px] text-[#1a1a1a]/70 leading-relaxed font-normal max-w-xl mx-auto"
         >
           <p className="m-0 font-sans text-[16px] md:text-[18px] text-[#1a1a1a]/70 leading-relaxed font-normal">{COPY.subtitle}</p>
         </motion.div>
         {/* Sur iPhone l'île ne porte pas « Réserver » : l'action principale est ici, bien visible. */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5, ease: EASE }} className="hero-cta-mobile pointer-events-auto mt-7">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={phoneReady ? { opacity: 1, y: 0 } : undefined} transition={{ duration: 1, delay: textDelay + 0.5, ease: EASE }} className="hero-cta-mobile pointer-events-auto mt-7">
           <a className="button" href="/booking.html">Réserver une coupe</a>
         </motion.div>
       </motion.div>

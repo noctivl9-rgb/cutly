@@ -9,18 +9,20 @@ const clientPages = ['index.html', 'services.html', 'shop.html', 'booking.html',
   'appointments.html', 'appointment.html', 'history.html', 'account.html', 'profile.html', 'settings.html', 'loyalty.html',
   'terms.html', 'privacy.html', 'legal.html', 'terms-of-use.html', 'cancellation.html', 'install.html'];
 
-test('every client page shares the CUTLY island, stylesheet and four-tab iPhone navigation', () => {
+test('every client page shares one Liquid Glass top bar (logo, four sections, account, Réserver) and no bottom tab bar', () => {
   for (const page of clientPages) {
     const html = read(page);
     assert.match(html, /href="\/mobile-app\.css"/, `${page} uses the design system`);
-    assert.ok(html.includes('<script src="/island.js" defer></script>'), `${page} loads the island behaviour`);
-    if (page !== 'index.html') assert.match(html, /<header class="island" data-island>[\s\S]*class="island-toggle"[\s\S]*<\/header>/, `${page} shows the CUTLY island`);
-    else assert.ok(read('assets/home/home.js').includes('island-bar'), 'home island rendered by React');
-    const navs = html.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/g) || [];
-    assert.equal(navs.length, 1, `${page} has one bottom navigation`);
-    const targets = [...navs[0].matchAll(/<a href="([^"]+)"/g)].map(match => match[1]);
-    assert.deepEqual(targets, ['/', '/booking.html', '/appointments.html', '/profile.html'], `${page} tab order`);
-    assert.ok((navs[0].match(/aria-current="page"/g) || []).length <= 1, `${page} has at most one active tab`);
+    assert.match(html, /href="\/glass\.css"/, `${page} loads the glass bar`);
+    assert.ok(html.includes('<script src="/signature.js" defer></script>'), `${page} loads the bar behaviour`);
+    assert.doesNotMatch(html, /island|bottom-nav/, `${page} has no Dynamic Island nor bottom tab bar`);
+    const bar = page === 'index.html' ? read('assets/home/home.js') : (html.match(/<header class="topbar" data-topbar>[\s\S]*?<\/header>/) || [''])[0];
+    for (const part of ['topbar-logo', 'topbar-links', 'topbar-account', 'topbar-cta']) assert.ok(bar.includes(part), `${page} bar has ${part}`);
+    if (page !== 'index.html') {
+      const targets = [...bar.matchAll(/<a (?:class="[^"]+" )?href="([^"]+)"/g)].map(match => match[1]);
+      assert.deepEqual(targets, ['/', '/services.html', '/shop.html', '/appointments.html', '/loyalty.html', '/profile.html', '/booking.html'], `${page} bar links`);
+      assert.ok((bar.match(/aria-current="page"/g) || []).length <= 1, `${page} has at most one active section`);
+    }
   }
 });
 
@@ -71,7 +73,7 @@ test('home hero is the React build of the provided spec, adapted to CUTLY, with 
   assert.doesNotMatch(bundle, /Short notes|Link up|Philosophy/, 'reference copy never ships');
   const source = fs.readFileSync(path.join(__dirname, '../hero/App.tsx'), 'utf8');
   for (const snippet of ['deleting ? 50 : 100', 'setTimeout(() => setDeleting(true), 2000)', 'const EASE = [0.16, 1, 0.3, 1]',
-    'duration: 1.5, ease: EASE', 'duration: 1.2, delay: 0.3, ease: EASE', "duration: 0.8, repeat: Infinity, ease: 'linear'"]) {
+    'duration: 1.5, delay: textDelay, ease: EASE', 'duration: 1.2, delay: textDelay + 0.3, ease: EASE', 'onLoadedData={() => setPhoneReady(true)}', "duration: 0.8, repeat: Infinity, ease: 'linear'"]) {
     assert.ok(source.includes(snippet), `App.tsx keeps ${snippet}`);
   }
   const css = read('assets/home/home.css');
