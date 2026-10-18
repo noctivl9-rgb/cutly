@@ -7,13 +7,13 @@ const { hashPassword, verifyPassword, verifyAndConsumeTotp, createSession, sessi
 const { createBooking } = require('./lib/booking');
 const { getDayAvailability, getMonthAvailability } = require('./lib/availability');
 const { registerClient, resendClientVerification, verifyEmail, requestPasswordReset, resetClientPassword } = require('./lib/accounts');
-const { emailConfigured, publicBaseUrl, sendVerificationEmail, providerStatus } = require('./lib/providers');
+const { emailConfigured, publicBaseUrl, providerStatus } = require('./lib/providers');
 const { transitionAppointment, modifyAppointment } = require('./lib/appointments');
 const { recordOnsitePayment, correctOnsitePayment } = require('./lib/payments');
 const { submitReview, decideReview } = require('./lib/reviews');
 const { getDashboardSummary } = require('./lib/dashboard');
 const { requestCancellation, resolveCancellationRequest } = require('./lib/cancellations');
-const { processOutbox } = require('./lib/notifications');
+const { processOutbox, enqueueAccountEmail, applyProviderEvent, verifyWebhookSignature } = require('./lib/notifications');
 const { dispatchScheduledNotifications } = require('./lib/scheduled-jobs');
 const { consumeAttempt } = require('./lib/rate-limit');
 const { withTransaction } = require('./lib/database');
@@ -197,6 +197,11 @@ const migrations=[
   if(!hasColumn('notification_outbox','provider_message_id'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN provider_message_id TEXT');
   if(!hasColumn('notification_outbox','provider_status'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN provider_status TEXT');
  }},
+ {version:8,name:'notification-tracking',up:()=>{
+  if(!hasColumn('notification_outbox','dedupe_key'))bootstrapDb.exec('ALTER TABLE notification_outbox ADD COLUMN dedupe_key TEXT');
+  bootstrapDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS outbox_dedupe_uq ON notification_outbox(dedupe_key) WHERE dedupe_key IS NOT NULL; CREATE INDEX IF NOT EXISTS outbox_provider_msg_idx ON notification_outbox(provider_message_id)');
+  bootstrapDb.exec('CREATE TABLE IF NOT EXISTS notification_events(id TEXT PRIMARY KEY,outbox_id TEXT REFERENCES notification_outbox(id),provider_event_id TEXT NOT NULL UNIQUE,provider_message_id TEXT,type TEXT NOT NULL,occurred_at TEXT NOT NULL,received_at TEXT NOT NULL,detail TEXT); CREATE INDEX IF NOT EXISTS notification_events_outbox_idx ON notification_events(outbox_id); CREATE TABLE IF NOT EXISTS email_suppressions(email TEXT PRIMARY KEY,reason TEXT NOT NULL,created_at TEXT NOT NULL)');
+ }},
  {version:7,name:'shared-rate-limits',up:()=>bootstrapDb.exec('CREATE TABLE IF NOT EXISTS rate_limits(key_hash TEXT PRIMARY KEY,attempts INTEGER NOT NULL,expires_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS rate_limits_expiry_idx ON rate_limits(expires_at);')}
 ];
 for(const migration of migrations){
@@ -222,7 +227,9 @@ for (let day=0; day<7; day++) seedHours.run(shop.id,day,(day===0||day===6)?'09:0
 }
 
 // Latest version recorded by db/postgres/schema.sql (and the Netlify Database migration copy).
-const POSTGRES_SCHEMA_VERSION=7;
+const POSTGRES_SCHEMA_VERSION=8;
+// Updates applied after schema.sql (version 7) : [version, file]. Netlify Database applies the same files as migrations.
+const POSTGRES_UPDATES=[[8,'db/postgres/updates/0002_notification_tracking.sql']];
 async function initializePostgres(){
  if(db.kind!=='POSTGRES')return;
  const schema=fs.readFileSync(path.join(ROOT,'db/postgres/schema.sql'),'utf8');
@@ -232,7 +239,9 @@ async function initializePostgres(){
   // only create the schema here when the current version is not already present.
   const registry=await tx.prepare("SELECT to_regclass('public.schema_migrations') IS NOT NULL AS present").get();
   const current=registry?.present?await tx.prepare('SELECT MAX(version) AS version FROM schema_migrations').get():null;
-  if(!(Number(current?.version)>=POSTGRES_SCHEMA_VERSION))await tx.exec(schema);
+  const installed=Number(current?.version)||0;
+  if(installed<7)await tx.exec(schema);
+  for(const [version,file] of POSTGRES_UPDATES)if(installed<version)await tx.exec(fs.readFileSync(path.join(ROOT,file),'utf8'));
   await tx.prepare(`INSERT INTO establishments(id,name,address,phone,instagram,description,timezone) VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).run(shop.id,shop.name,shop.address,shop.phone,shop.instagram,shop.description,'Europe/Paris');
   const services=[['degrade-classique','Dégradé classique',500,30,1],['burst-fade','Burst Fade',700,30,1],['taper','Taper',500,30,1],['coupe-classique','Coupe classique',500,30,1],['contours','Contours',500,15,0]];
   for(const [id,name,price,duration,eligible] of services)await tx.prepare('INSERT INTO services(id,establishment_id,name,price_cents,duration_minutes,eligible) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,shop.id,name,price,duration,eligible);
@@ -245,6 +254,8 @@ async function findService(id,establishmentId){return (await db.prepare('SELECT 
 const MIME = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml' };
 const SECURITY_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin','x-frame-options':'DENY','permissions-policy':'camera=(), microphone=(), geolocation=()','content-security-policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"};
 function json(res,status,payload,extra={}) { res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...SECURITY_HEADERS,...extra});res.end(JSON.stringify(payload)); }
+function queueAccountEmail(message){return enqueueAccountEmail(db,{kind:message.kind==='password-reset'?'password-reset':'verify-email',to:message.to,token:message.token,firstName:message.firstName,idempotencyKey:message.idempotencyKey});}
+function readRawBody(req,limit=65_536){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>limit){reject(new Error('body_too_large'));req.destroy();}});req.on('end',()=>resolve(raw));req.on('error',reject);});}
 function readBody(req){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>16_384){reject(new Error('body_too_large'));req.destroy();}});req.on('end',()=>{try{resolve(JSON.parse(raw||'{}'));}catch{reject(new Error('invalid_json'));}});req.on('error',reject);});}
 const loginAttempts=new Map();
 const dummyPasswordHash=hashPassword('CUTLY-unknown-account-password');
@@ -266,15 +277,31 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&url.pathname==='/healthz'){
     try{await db.prepare('SELECT 1 AS ok').get();return json(res,200,{status:'ok'});}catch{return json(res,503,{status:'unavailable'});}
   }
+  // Webhook du fournisseur d'e-mails : serveur à serveur, authentifié par signature (aucun cookie, aucune origine navigateur).
+  if(req.method==='POST'&&url.pathname==='/api/webhooks/resend'){
+   const secret=process.env.RESEND_WEBHOOK_SECRET;if(!secret)return json(res,503,{error:'webhook_not_configured'});
+   let raw;try{raw=await readRawBody(req);}catch{return json(res,413,{error:'body_too_large'});}
+   const h=req.headers;if(!verifyWebhookSignature({secret,id:h['svix-id'],timestamp:h['svix-timestamp'],signature:h['svix-signature'],body:raw}))return json(res,401,{error:'invalid_signature'});
+   let event;try{event=JSON.parse(raw);}catch{return json(res,400,{error:'invalid_json'});}
+   const data=event?.data||{};
+   const result=await applyProviderEvent(db,{eventId:String(h['svix-id']),type:String(event?.type||''),messageId:data.email_id||null,occurredAt:event?.created_at||null,recipients:Array.isArray(data.to)?data.to:[],bounceType:data.bounce?.type||null,detail:data.bounce?.message||data.failed?.reason||null});
+   return json(res,200,{ok:true,...result});
+  }
+  // Historique des notifications (administrateur) : état de chaque e-mail, sans contenu ni lien.
+  if(req.method==='GET'&&url.pathname==='/api/admin/notifications'){
+   const session=await sessionFor(req);if(!session||session.role!=='ESTABLISHMENT_ADMIN')return json(res,401,{error:'authentication_required'});
+   const rows=await db.prepare("SELECT id,appointment_id AS appointmentId,channel,kind,status,provider_name AS provider,provider_status AS providerStatus,attempts,last_error AS lastError,created_at AS createdAt,sent_at AS sentAt FROM notification_outbox ORDER BY created_at DESC LIMIT 100").all();
+   return json(res,200,{notifications:rows,provider:providerStatus().email});
+  }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/register'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,'register');if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});
     if(!await db.prepare("SELECT 1 FROM users u JOIN establishment_members m ON m.user_id=u.id JOIN admin_mfa f ON f.user_id=u.id WHERE u.role='ESTABLISHMENT_ADMIN' AND u.disabled_at IS NULL AND m.establishment_id='thomas-shop' AND m.role='ESTABLISHMENT_ADMIN' AND m.active=1 AND f.enabled=1 LIMIT 1").get())return json(res,503,{error:'administrator_not_initialized'});
    if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-    try{const account=await registerClient(db,body,{sendEmail:message=>sendVerificationEmail(message)});const session=await createSession(db,account.userId,req.headers['user-agent']);return json(res,201,{email:account.email,verificationRequired:account.verificationRequired},{'set-cookie':cookieHeader(session.token)});}catch(error){return adminFailure(res,error);}
+    try{const account=await registerClient(db,body,{sendEmail:queueAccountEmail});const session=await createSession(db,account.userId,req.headers['user-agent']);return json(res,201,{email:account.email,verificationRequired:account.verificationRequired},{'set-cookie':cookieHeader(session.token)});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/resend-verification'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-   try{return json(res,202,await resendClientVerification(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message)}));}catch(error){return adminFailure(res,error);}
+   try{return json(res,202,await resendClientVerification(db,{email:body.email,sendEmail:queueAccountEmail}));}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-email'){
     if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await verifyEmail(db,{token:body.token}));}catch(error){return adminFailure(res,error);}
@@ -282,7 +309,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='POST'&&url.pathname==='/api/auth/client/verify-phone')return json(res,410,{error:'phone_verification_not_required'});
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req),key=rateLimitKey(req,body.email);if(!await allowPublicAttempt(key,3,60*60*1000))return json(res,429,{error:'too_many_attempts'});if(!emailConfigured())return json(res,503,{error:'email_provider_not_configured'});try{publicBaseUrl();}catch(error){return adminFailure(res,error);}
-   try{await requestPasswordReset(db,{email:body.email,sendEmail:message=>sendVerificationEmail(message),sendSms:message=>sendPhoneCode(message)});return json(res,202,{accepted:true});}catch(error){return adminFailure(res,error);}
+   try{await requestPasswordReset(db,{email:body.email,sendEmail:queueAccountEmail});return json(res,202,{accepted:true});}catch(error){return adminFailure(res,error);}
   }
   if(req.method==='POST'&&url.pathname==='/api/auth/client/password-reset/confirm'){
    if(!checkSameOrigin(req))return json(res,403,{error:'origin_rejected'});const body=await readBody(req);try{return json(res,200,await resetClientPassword(db,{token:body.token,newPassword:body.newPassword}));}catch(error){return adminFailure(res,error);}
@@ -491,7 +518,7 @@ const databaseReady=initializePostgres();
 if(require.main===module){
  databaseReady.then(()=>{
   server.listen(port,host,()=>console.log(`CUTLY listening on ${host}:${server.address().port}`));
-  if(emailConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),15_000);worker.unref();}
+  if(emailConfigured()){const worker=setInterval(()=>processOutbox(db).catch(()=>console.error('CUTLY notification worker failed')),Math.max(500,Number(process.env.CUTLY_OUTBOX_INTERVAL_MS)||15_000));worker.unref();}
  }).catch(async error=>{console.error('CUTLY database initialization failed',error.code||'database_error');await db.close().catch(()=>{});process.exitCode=1;});
  let shuttingDown=false;function shutdown(){if(shuttingDown)return;shuttingDown=true;const timeout=setTimeout(()=>process.exit(1),10_000);timeout.unref();server.close(async()=>{await db.close();clearTimeout(timeout);process.exit(0);});}
  process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);

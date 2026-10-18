@@ -75,10 +75,10 @@
   async function detail() {
     const id = query.get('id');
     let item;
-    // Search only the current user's server-filtered list. Never fetch another client's data.
-    if (id && id.length <= 100) for (let offset = 0; offset <= 10000; offset += 100) {
-      const batch = await ownedAppointments(offset); item = batch.find(row => row.id === id);
-      if (item || batch.length < 100) break;
+    // The endpoint enforces ownership and avoids scanning the client's full history.
+    if (id && id.length <= 100) {
+      try { item = (await api(`/api/client/appointments/${encodeURIComponent(id)}`)).appointment; }
+      catch (error) { if (error.status !== 404) throw error; }
     }
     const content = document.querySelector('#appointment-detail');
     content.replaceChildren();

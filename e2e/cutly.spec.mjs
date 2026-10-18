@@ -41,7 +41,7 @@ test.beforeAll(async ({ request }, testInfo) => {
   clientToken = seedAccount(`client.${suffix}@cutly.test`, suffix === 'iphone' ? '+33600000101' : '+33600000102');
   otherToken = seedAccount(`autre.${suffix}@cutly.test`, suffix === 'iphone' ? '+33600000201' : '+33600000202');
   myTime = suffix === 'iphone' ? '11:00' : '12:00';
-  // Un autre client occupe 10:00 (Burst Fade, 30 min) : 09:45, 10:00 et 10:15 doivent apparaître « occupé ».
+  // Un autre client occupe 10:00 (Burst Fade, 30 min) : ce créneau doit apparaître « occupé ».
   await request.post('/api/bookings', {
     headers: { cookie: `cutly_session=${otherToken}`, origin: BASE },
     data: { serviceId: 'burst-fade', date: DATE, time: '10:00', idempotencyKey: `e2e-other-${DATE}`, expectedPriceCents: 700, expectedDurationMinutes: 30 }
@@ -76,7 +76,9 @@ test('réservation complète : créneaux occupés visibles et non sélectionnabl
   await day.click();
   await page.getByRole('button', { name: /Voir les horaires/ }).click();
   await expect(page).toHaveURL(/slots\.html/);
-  for (const time of ['09:45', '10:00', '10:15']) await expect(page.getByRole('button', { name: `${time}, occupé` })).toBeDisabled();
+  // Départs toutes les 30 minutes : le créneau de 10:00 est occupé, les départs à 09:45, 10:15… n'existent pas.
+  await expect(page.getByRole('button', { name: '10:00, occupé' })).toBeDisabled();
+  for (const time of ['09:15', '09:45', '10:15', '13:15']) await expect(page.getByRole('button', { name: new RegExp(`^${time},`) })).toHaveCount(0);
   await page.getByRole('button', { name: `${myTime}, disponible` }).click();
   await expect(page.getByRole('button', { name: `${myTime}, sélectionné` })).toBeVisible();
   await page.getByRole('button', { name: /^Continuer/ }).click();

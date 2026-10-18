@@ -9,7 +9,7 @@ const path = require('node:path');
 const net = require('node:net');
 const { DatabaseSync } = require('node:sqlite');
 const { createBooking, BookingError } = require('../lib/booking');
-const { transitionAppointment, AppointmentError } = require('../lib/appointments');
+const { transitionAppointment, modifyAppointment, AppointmentError } = require('../lib/appointments');
 const { reconcileCompletedPaidAppointment, LoyaltyError } = require('../lib/loyalty');
 const { recordOnsitePayment, correctOnsitePayment, PaymentError } = require('../lib/payments');
 const { submitReview, decideReview, ReviewError } = require('../lib/reviews');
@@ -77,7 +77,7 @@ test('availability follows duration, weekend and past-time rules',async()=>{
  const closed=await (await fetch(`${baseUrl}/api/availability?service=taper&date=${monday.toISOString().slice(0,10)}`)).json();
  const invalid=await (await fetch(`${baseUrl}/api/availability?service=taper&date=2026-02-31`)).json();
  assert.equal(thirty.slots.at(-1),'18:30');assert.ok(!thirty.slots.includes('18:45'));
- assert.equal(fifteen.slots.at(-1),'18:45');assert.deepEqual(closed.slots,[]);assert.deepEqual(invalid.slots,[]);
+ assert.equal(fifteen.slots.at(-1),'18:30');assert.deepEqual(closed.slots,[]);assert.deepEqual(invalid.slots,[]);
 });
 
 test('booking cannot bypass required verified account',async()=>{
@@ -162,7 +162,7 @@ test('admin HTTP routes require password, TOTP, an active membership and a valid
  const keptHours=await fetch(`${baseUrl}/api/admin/hours/6`,{method:'PATCH',headers:{cookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:saturdayHours.version,opens:'09:00',closes:'19:00'})});assert.equal(keptHours.status,200);assert.equal((await keptHours.json()).version,saturdayHours.version+1);
  const mondayHours=hours.hours.find(item=>item.weekday===1),[weekSat,weekSun]=upcomingWeekend(),mondayDate=new Date(`${weekSun}T12:00:00Z`);mondayDate.setUTCDate(mondayDate.getUTCDate()+1);const monday=mondayDate.toISOString().slice(0,10);
  const openMonday=await fetch(`${baseUrl}/api/admin/hours/1`,{method:'PATCH',headers:{cookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:mondayHours.version,opens:'10:00',closes:'11:00'})});assert.equal(openMonday.status,200);
- const mondaySlots=await (await fetch(`${baseUrl}/api/availability?service=contours&date=${monday}`)).json();assert.deepEqual(mondaySlots.slots,['10:00','10:15','10:30','10:45']);
+ const mondaySlots=await (await fetch(`${baseUrl}/api/availability?service=contours&date=${monday}`)).json();assert.deepEqual(mondaySlots.slots,['10:00','10:30']);
  const restoreMonday=await fetch(`${baseUrl}/api/admin/hours/1`,{method:'PATCH',headers:{cookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({version:mondayHours.version+1,opens:null,closes:null})});assert.equal(restoreMonday.status,200);
  const conflict=await fetch(`${baseUrl}/api/admin/unavailabilities`,{method:'POST',headers:{cookie,origin:baseUrl,'content-type':'application/json'},body:JSON.stringify({startsAt:'2040-01-07T09:45:00.000Z',endsAt:'2040-01-07T10:15:00.000Z',reason:'Test conflit'})});assert.equal(conflict.status,409);assert.equal((await conflict.json()).appointments[0].id,'block-conflict');
  const cleanupDb=new DatabaseSync(path.join(tempDir,'cutly.sqlite'));try{cleanupDb.prepare("DELETE FROM appointments WHERE id='block-conflict'").run();}finally{cleanupDb.close();}
@@ -261,7 +261,7 @@ test('booking service requires verified identity and creates an idempotent histo
   const snapshot=db.prepare('SELECT service_name_snapshot,price_cents_snapshot,duration_minutes_snapshot FROM appointments WHERE id=?').get(first.id);
   assert.deepEqual(Object.values(snapshot),['Coupe classique',500,30]);
   await assert.rejects(()=>createBooking(db,{...input,userId:'unverified-client',idempotencyKey:'booking-test-key-0002'}),e=>e instanceof BookingError&&e.code==='account_verification_required');
-  await assert.rejects(()=>createBooking(db,{...input,time:'09:15',idempotencyKey:'booking-test-key-0003'}),e=>e instanceof BookingError&&e.code==='slot_unavailable');
+  await assert.rejects(()=>createBooking(db,{...input,time:'09:15',idempotencyKey:'booking-test-key-0003'}),e=>e instanceof BookingError&&e.code==='outside_opening_hours');
   db.prepare('UPDATE users SET phone=NULL WHERE id=?').run('verified-client');
   await assert.rejects(()=>createBooking(db,{...input,idempotencyKey:'booking-test-key-0004',time:'09:30'}),e=>e instanceof BookingError&&e.code==='phone_contact_required');
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM appointments WHERE client_email='verified@example.com'").get().count,1);
@@ -489,7 +489,7 @@ test('public day and month routes reflect real booking acceptance and rejection 
   const read=async()=>(await fetch(`${baseUrl}/api/availability?service=coupe-classique&date=${date}`)).json();
   const pending=await read();
   assert.equal(pending.entries.find(entry=>entry.time==='10:00').status,'OCCUPIED');
-  assert.equal(pending.entries.find(entry=>entry.time==='10:15').status,'OCCUPIED');
+  assert.equal(pending.entries.some(entry=>entry.time==='10:15'),false);
   assert.equal(JSON.stringify(pending).includes('grid-client'),false);assert.equal(JSON.stringify(pending).includes('Private'),false);
   const rejected=await transitionAppointment(db,{appointmentId:booking.id,actorId:'grid-admin',to:'REJECTED',expectedVersion:1,reason:'Test refusal'});
   assert.equal(rejected.status,'REJECTED');assert.ok((await read()).slots.includes('10:00'));
@@ -553,4 +553,25 @@ test('booking rejects changed catalogue expectations atomically and leaves the s
   body.idempotencyKey='price-expectation-invalid-key';body.expectedPriceCents='500';
   const invalid=await send();assert.equal(invalid.status,400);assert.equal((await invalid.json()).error,'invalid_booking_request');
  }finally{db.prepare("UPDATE services SET price_cents=?,duration_minutes=? WHERE id='coupe-classique'").run(original.price_cents,original.duration_minutes);db.close();}
+});
+
+test('half-hour starts are enforced for creation and modification while Contours stays 15 minutes',async()=>{
+ const db=new DatabaseSync(path.join(tempDir,'cutly.sqlite')),stamp=new Date().toISOString(),[date]=upcomingWeekend(10);
+ try{
+  for(const [id,role] of [['half-client','CLIENT'],['half-admin','ESTABLISHMENT_ADMIN']])db.prepare(`INSERT INTO users(id,email,phone,first_name,last_name,password_hash,email_verified_at,role,created_at,updated_at) VALUES(?,?,?,'Test','Half','test-hash',?,?,?,?)`).run(id,`${id}@example.test`,id==='half-client'?'+33799123001':'+33799123002',stamp,role,stamp,stamp);
+  db.prepare("INSERT INTO establishment_members(user_id,establishment_id,role) VALUES('half-admin','thomas-shop','ESTABLISHMENT_ADMIN')").run();
+  const input={userId:'half-client',serviceId:'contours',date};
+  const first=await createBooking(db,{...input,time:'13:00',idempotencyKey:'half-hour-test-first'});
+  assert.equal(first.status,'PENDING');assert.equal(first.durationMinutes,15);assert.equal(Date.parse(first.endsAt)-Date.parse(first.startsAt),15*60000);
+  for(const time of ['13:15','13:45','18:45','19:00'])await assert.rejects(()=>createBooking(db,{...input,time,idempotencyKey:`half-hour-test-${time}`}),{code:'outside_opening_hours'});
+  await assert.rejects(()=>createBooking(db,{...input,time:'13:00',idempotencyKey:'half-hour-test-conflict'}),{code:'slot_unavailable'});
+  const next=await createBooking(db,{...input,serviceId:'coupe-classique',time:'13:30',idempotencyKey:'half-hour-test-next'});
+  assert.equal(next.durationMinutes,30);
+  for(const time of ['13:15','13:45'])await assert.rejects(()=>modifyAppointment(db,{appointmentId:next.id,actorId:'half-admin',expectedVersion:1,serviceId:'coupe-classique',date,time}),{code:'outside_opening_hours'});
+  assert.equal(db.prepare('SELECT starts_at FROM appointments WHERE id=?').get(next.id).starts_at,next.startsAt);
+  await transitionAppointment(db,{appointmentId:first.id,actorId:'half-admin',to:'REJECTED',expectedVersion:1,reason:'Test only'});
+  assert.equal((await createBooking(db,{...input,time:'13:00',idempotencyKey:'half-hour-test-released'})).status,'PENDING');
+  const closing=await createBooking(db,{...input,serviceId:'coupe-classique',time:'18:30',idempotencyKey:'half-hour-test-closing'});
+  assert.equal(closing.endsAt,parisToUTC(date,'19:00').toISOString());
+ }finally{db.close();}
 });

@@ -1,4 +1,4 @@
-/* CUTLY — espace client. Utilise les jetons de mobile-app.css (design « Éditorial »). */
+/* CUTLY V12 — espace client, même papier végétal et bleu que l'accueil Nokia. */
 .client-content{max-width:680px;margin-inline:auto}
 .client-content #client-page-content>.page-title,#identity-page>.page-title{margin-bottom:var(--s2)}
 .client-content #client-page-content>.muted,#identity-page>.muted{margin-bottom:var(--s5);font-size:14.5px}
@@ -9,6 +9,7 @@
 .client-form label{display:grid;gap:6px;font-size:14px;font-weight:500;color:var(--ink-2)}
 .client-form input,.client-form select,.client-form textarea{width:100%;min-height:48px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-ctl);background:var(--surface);color:var(--ink);font:inherit;font-size:16px;font-weight:400}
 .client-form textarea{resize:vertical}
+.client-form :is(input,select,textarea):focus-visible{outline:2px solid var(--sea);outline-offset:2px;border-color:var(--sea)}
 .client-form .check{display:flex;gap:12px;align-items:flex-start;font-weight:400;font-size:14.5px;color:var(--ink)}
 .client-form .check input{width:20px;min-height:20px;height:20px;flex-shrink:0;margin-top:2px}
 .client-form .button{width:100%}
@@ -18,21 +19,21 @@
 .client-content section[data-auth-panel]>p:first-child{color:var(--muted);margin-bottom:var(--s4);font-size:14.5px}
 
 /* Onglets : soulignement, pas de pastilles */
-.client-tabs{display:flex;gap:var(--s5);margin:var(--s3) 0 var(--s2);border-bottom:1px solid var(--line)}
+.client-tabs{display:flex;flex-wrap:wrap;gap:0 var(--s5);margin:var(--s3) 0 var(--s2);border-bottom:1px solid var(--line)}
 .client-tabs a{position:relative;min-height:44px;display:inline-flex;align-items:center;color:var(--muted);text-decoration:none;font-size:14.5px;font-weight:500;transition:color var(--fast)}
 .client-tabs a:hover{color:var(--ink)}
-.client-tabs a[aria-current=page]{color:var(--ink)}
-.client-tabs a[aria-current=page]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--ink)}
+.client-tabs a[aria-current=page]{color:var(--sea)}
+.client-tabs a[aria-current=page]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--sea)}
 
 /* Rendez-vous : liste éditoriale (date à gauche, détails à droite) */
 #appointments-list{gap:0}
 .appointment-link{display:flex;gap:var(--s4);align-items:flex-start;color:inherit;text-decoration:none;padding:var(--s4) 0;border-bottom:1px solid var(--line);transition:background var(--fast)}
 .appointment-link:hover .appointment-body strong{text-decoration:underline;text-decoration-color:var(--line-strong)}
-.date-tile{display:grid;justify-items:start;align-content:start;width:52px;flex-shrink:0;padding-top:2px;line-height:1.1}
+.date-tile{display:grid;justify-items:start;align-content:start;width:52px;flex-shrink:0;padding-top:2px;line-height:1.1;border-right:1px solid var(--line)}
 .date-tile span{font-size:12px;font-weight:500;color:var(--muted);text-transform:capitalize}
 .date-tile strong{font-family:var(--font-display);font-weight:400;font-size:34px;line-height:1;color:var(--ink);font-variant-numeric:lining-nums}
 .appointment-body{display:grid;gap:2px;min-width:0;flex:1}
-.appointment-body strong{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.appointment-body strong{font-family:var(--font-display);font-size:24px;line-height:1.15;font-weight:400;letter-spacing:-.01em}
 .appointment-when{font-size:14.5px;color:var(--ink-2)}
 .appointment-body .muted{font-size:13.5px}
 .appointment-body .client-status{margin-top:4px}
@@ -61,8 +62,8 @@
 #client-error{display:grid;gap:var(--s3)}
 #client-error a{font-weight:600}
 .client-content h2{font-size:24px;margin:0 0 var(--s3)}
-.client-content .panel{margin-top:var(--s4);padding:4px var(--s4)}
-.client-content .panel:has(form){padding:var(--s5)}
+.client-content .panel{margin-top:var(--s4);padding:var(--s3) 0}
+.client-content .panel:has(form){padding:var(--s5) 0}
 .client-content section+section{margin-top:var(--s6)}
 .client-content [hidden]{display:none!important}
 #load-more{width:100%}

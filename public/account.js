@@ -12,13 +12,20 @@
     let response;
     try { response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options, headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...options.headers } }); }
     catch { throw new Error('network_unavailable'); }
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => { throw new Error('invalid_server_response'); });
     if (!response.ok) { const error = new Error(data.error || 'request_failed'); error.status = response.status; throw error; }
     return data;
   }
   const labels = {
     authentication_required: 'Votre session a expiré. Reconnectez-vous pour continuer.',
     network_unavailable: 'Connexion interrompue. Vérifiez votre réseau puis réessayez.',
+    invalid_server_response: 'Le serveur a renvoyé une réponse inattendue. Réessayez dans un instant.',
+    invalid_email: 'Saisissez une adresse e-mail valide.',
+    invalid_password: 'Choisissez un mot de passe d’au moins 12 caractères.',
+    invalid_first_name: 'Saisissez votre prénom (80 caractères maximum).',
+    invalid_last_name: 'Saisissez votre nom (80 caractères maximum).',
+    invalid_profile: 'Vérifiez votre nom, votre prénom et votre langue.',
+    credentials_changed: 'Votre mot de passe a changé ailleurs. Reconnectez-vous avant de réessayer.',
     invalid_credentials: 'E-mail ou mot de passe incorrect.',
     email_provider_not_configured: 'L’envoi des e-mails est indisponible. Réessayez plus tard.',
     public_base_url_not_configured: 'L’inscription n’est pas encore disponible.',
@@ -61,14 +68,21 @@
     else returnTo = safeReturn(sessionStorage.getItem('cutly-account-return'));
   } catch {}
   const mode = query.has('resetPassword') ? 'reset' : query.has('verifyEmail') ? 'verify' : ['register', 'forgot', 'verify'].includes(query.get('mode')) ? query.get('mode') : 'login';
+  // Keep a recovery token in this page's memory, never in subsequent navigation URLs.
+  if (query.has('resetPassword')) history.replaceState({}, '', `/account.html?mode=reset&return=${encodeURIComponent(returnTo)}`);
   document.querySelectorAll('[data-auth-panel]').forEach(panel => { panel.hidden = panel.dataset.authPanel !== mode; });
   const titles = { login: 'Ravi de vous retrouver', register: 'Créer mon compte', forgot: 'Retrouver mon compte', reset: 'Nouveau mot de passe', verify: 'Vérifier mon e-mail' };
   document.querySelector('h1').textContent = titles[mode];
   for (const link of document.querySelectorAll('[data-auth-mode]')) link.href = `/account.html?mode=${link.dataset.authMode}&return=${encodeURIComponent(returnTo)}`;
+  // Le lien de vérification s'ouvre souvent dans un autre onglet : le brouillon de réservation (propre à l'onglet) est gardé 24 h pour reprendre le parcours.
+  const stashDraft = () => { try { localStorage.setItem('cutly-booking-resume', JSON.stringify({ at: Date.now(), draft: sessionStorage.getItem('cutly-booking-v2'), returnTo })); } catch {} };
+  const restoreDraft = () => { try { const raw = localStorage.getItem('cutly-booking-resume'); if (!raw) return null; localStorage.removeItem('cutly-booking-resume'); const saved = JSON.parse(raw); if (Date.now() - saved.at >= 86400000) return null; if (saved.draft && !sessionStorage.getItem('cutly-booking-v2')) sessionStorage.setItem('cutly-booking-v2', saved.draft); return saved; } catch { return null; } };
+  // À l'arrivée par le lien reçu par e-mail (nouvel onglet vide), on ne remplace pas la sauvegarde de l'onglet d'origine.
+  if (mode === 'verify' && !query.has('verifyEmail')) stashDraft();
   const goNext = async () => {
     const profile = await api('/api/client/profile');
-    if (!profile.emailVerifiedAt) location.assign(`/account.html?mode=verify&return=${encodeURIComponent(returnTo)}`);
-    else location.assign(returnTo);
+    if (!profile.emailVerifiedAt) { stashDraft(); location.assign(`/account.html?mode=verify&return=${encodeURIComponent(returnTo)}`); }
+    else { const saved = restoreDraft(); location.assign(!query.has('return') && saved?.returnTo ? safeReturn(saved.returnTo) : returnTo); }
   };
   const bind = (id, action) => {
     const form = document.getElementById(id);
@@ -91,14 +105,15 @@
     document.querySelector('#reset-login').hidden = false;
   });
   document.querySelector('#verification-check').addEventListener('click', async event => {
-    event.currentTarget.disabled = true;
+    const button = event.currentTarget;
+    button.disabled = true;
     const output = document.querySelector('#verify-email-message');
     try {
       const profile = await api('/api/client/profile');
       if (profile.emailVerifiedAt) location.assign(returnTo);
       else output.textContent = 'Votre adresse n’est pas encore vérifiée. Ouvrez le lien reçu par e-mail, puis revenez ici.';
     } catch (error) { output.textContent = message(error); }
-    finally { event.currentTarget.disabled = false; }
+    finally { button.disabled = false; }
   });
   if (query.has('verifyEmail')) {
     const token = query.get('verifyEmail');

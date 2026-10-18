@@ -17,10 +17,21 @@ test('Netlify Database migration carries the full PostgreSQL schema and Thomas S
   assert.match(migration, /INSERT INTO opening_hours[\s\S]*\('thomas-shop',6,'09:00','19:00'\)/);
 });
 
-test('server skips DDL only when the schema version recorded by schema.sql is present', () => {
+test('server applies PostgreSQL updates in order and the Netlify migrations mirror them', () => {
   const versions = [...schema.matchAll(/\((\d+),'[a-z-]+'\)/g)].map(match => Number(match[1]));
+  assert.equal(Math.max(...versions), 7, 'schema.sql stays at version 7; later changes are updates');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
-  assert.equal(Number(server.match(/const POSTGRES_SCHEMA_VERSION=(\d+);/)[1]), Math.max(...versions));
+  const updateDir = path.join(root, 'db/postgres/updates');
+  let latest = 7;
+  for (const file of fs.readdirSync(updateDir).sort()) {
+    const sql = fs.readFileSync(path.join(updateDir, file), 'utf8');
+    const version = Number(sql.match(/VALUES \((\d+),/)[1]);
+    assert.ok(version > latest, `${file} follows the previous version`);
+    latest = version;
+    assert.ok(server.includes(`[${version},'db/postgres/updates/${file}']`), `server applies ${file}`);
+    assert.equal(fs.readFileSync(path.join(migrationsDir, file), 'utf8'), sql, `Netlify migration ${file} is identical`);
+  }
+  assert.equal(Number(server.match(/const POSTGRES_SCHEMA_VERSION=(\d+);/)[1]), latest);
 });
 
 test('test runner strips hosted database and Netlify production variables', () => {

@@ -44,4 +44,4 @@ Le dépôt public est [noctivl9-rgb/cutly](https://github.com/noctivl9-rgb/cutly
 
 Une ancienne configuration Render est conservée dans le dépôt, mais Netlify est la cible active. La migration SQLite vers PostgreSQL doit être précédée d’une sauvegarde vérifiée ; voir [docs/POSTGRESQL_MIGRATION.md](docs/POSTGRESQL_MIGRATION.md).
 
-L’état de préparation, les limitations et les étapes encore nécessaires figurent dans [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). Voir aussi [docs/PROVIDERS.md](docs/PROVIDERS.md) et [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).
+L’état de préparation, les limitations et les étapes encore nécessaires figurent dans [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). E-mails (modèles, file d’envoi, configuration Resend, rappels) : [docs/EMAILS.md](docs/EMAILS.md). Voir aussi [docs/PROVIDERS.md](docs/PROVIDERS.md) et [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md).

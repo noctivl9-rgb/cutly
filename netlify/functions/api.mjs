@@ -2,20 +2,10 @@
 // Le serveur HTTP de CUTLY tourne tel quel dans la fonction ; chaque requête lui est relayée en local.
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import { loadCutlyEnv } from '../runtime/env.mjs';
 
 const require = createRequire(import.meta.url);
-const netlifyEnv = globalThis.Netlify?.env;
-
-// Variables du site (et de la base) visibles par le serveur CommonJS qui lit process.env.
-for (const key of ['NETLIFY_DB_URL', 'CUTLY_MFA_ENCRYPTION_KEY', 'CUTLY_PUBLIC_BASE_URL', 'CUTLY_EMAIL_FROM', 'CUTLY_JOB_TOKEN', 'RESEND_API_KEY']) {
-  const value = netlifyEnv?.get?.(key);
-  if (value && !process.env[key]) process.env[key] = value;
-}
-if (!process.env.NETLIFY_DB_URL && !process.env.CUTLY_DATABASE_URL) {
-  try { process.env.NETLIFY_DB_URL = require('@netlify/database').getConnectionString(); }
-  catch { console.error('CUTLY: Netlify Database connection string unavailable'); }
-}
-process.env.CUTLY_BEHIND_FUNCTION_PROXY = '1';
+loadCutlyEnv();
 
 const { server, databaseReady, db } = require('../../server.js');
 const { processOutbox } = require('../../lib/notifications.js');
