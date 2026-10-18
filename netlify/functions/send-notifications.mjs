@@ -5,9 +5,9 @@
 // reçoit (samedi et dimanche, 09 h–19 h) et la veille pour les rappels de 24 h. Cela limite les réveils de la base
 // Netlify (quota de calcul du plan gratuit). Si Thomas ouvre d'autres jours, élargir ce créneau (cron ci-dessous).
 import { createRequire } from 'node:module';
-import { loadCutlyEnv } from '../runtime/env.mjs';
 
 const require = createRequire(import.meta.url);
+const { loadCutlyEnv } = require('../../lib/netlify-env.js');
 loadCutlyEnv();
 
 const { databaseReady, db } = require('../../server.js');

@@ -55,3 +55,17 @@ test('client and admin login reject cross-site requests like every other state-c
     assert.match(server.slice(start, start + 220), /checkSameOrigin\(req\)\)return json\(res,403,\{error:'origin_rejected'\}\)/, `${route} checks origin`);
   }
 });
+
+test('les fonctions Netlify n’importent que des modules node: (un import local casse l’empaquetage de server.js)', () => {
+  const dir = path.join(__dirname, '..', 'netlify', 'functions');
+  const files = fs.readdirSync(dir).filter(file => /\.(mjs|js)$/.test(file));
+  assert.ok(files.includes('api.mjs') && files.includes('send-notifications.mjs'));
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(dir, file), 'utf8');
+    for (const [, specifier] of source.matchAll(/^\s*import\s[^'"\n]*['"]([^'"]+)['"]/gm)) {
+      assert.match(specifier, /^node:/, `${file} importe « ${specifier} » : utiliser require() via createRequire pour les fichiers du projet`);
+    }
+    assert.match(source, /require\('\.\.\/\.\.\/lib\/netlify-env\.js'\)/, `${file} charge l'environnement Netlify`);
+    assert.match(source, /require\('\.\.\/\.\.\/server\.js'\)/, `${file} charge le serveur CUTLY`);
+  }
+});

@@ -2,9 +2,9 @@
 // Le serveur HTTP de CUTLY tourne tel quel dans la fonction ; chaque requête lui est relayée en local.
 import http from 'node:http';
 import { createRequire } from 'node:module';
-import { loadCutlyEnv } from '../runtime/env.mjs';
 
 const require = createRequire(import.meta.url);
+const { loadCutlyEnv } = require('../../lib/netlify-env.js');
 loadCutlyEnv();
 
 const { server, databaseReady, db } = require('../../server.js');
