@@ -1,0 +1,25 @@
+# Déploiement Render (service web Node). La base PostgreSQL est externe (Neon recommandé)
+# ou une base Render Postgres : renseignez DATABASE_URL dans le tableau de bord.
+services:
+  - type: web
+    name: dossier-x
+    runtime: node
+    plan: starter # une instance unique : la diffusion temps réel est en mémoire (voir docs/deploiement.md)
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/server.ts
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.20.0
+      - key: DATABASE_URL
+        sync: false
+      - key: DX_ADMIN_EMAIL
+        sync: false
+      - key: DX_ADMIN_PASSWORD
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: PRINT_DOMAIN_CONFIRMED
+        value: "false"
+      - key: TRUST_PROXY
+        value: "1"
