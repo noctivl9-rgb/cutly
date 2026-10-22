@@ -4,7 +4,8 @@ services:
   - type: web
     name: dossier-x
     runtime: node
-    plan: starter # une instance unique : la diffusion temps réel est en mémoire (voir docs/deploiement.md)
+    plan: free # une seule instance : la diffusion temps réel est en mémoire (voir docs/deploiement.md)
+    region: frankfurt
     buildCommand: npm ci --omit=dev
     startCommand: node src/server.ts
     healthCheckPath: /api/health
