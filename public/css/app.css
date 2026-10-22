@@ -173,7 +173,7 @@ legend { font-family: var(--serif); font-size: 1.15rem; margin-bottom: 8px; }
   background: radial-gradient(ellipse at 70% 20%, rgba(168,43,53,.18), transparent 50%), radial-gradient(ellipse at 10% 90%, rgba(119,124,132,.12), transparent 50%); }
 .home-bg svg { position: absolute; right: -60px; bottom: -40px; width: 420px; opacity: .08; }
 .home-card { position: relative; width: 100%; max-width: 520px; text-align: center; }
-.home-title { font-family: var(--mono); font-weight: 600; font-size: clamp(2.6rem, 12vw, 4.4rem); letter-spacing: .28em; margin: 18px 0 6px; padding-left: .28em; line-height: 1; }
+.home-title { font-family: var(--mono); font-weight: 600; font-size: clamp(1.7rem, 8.5vw, 4.4rem); letter-spacing: .22em; margin: 18px 0 6px; padding-left: .22em; line-height: 1; white-space: nowrap; }
 .home-title .x { color: var(--red); }
 .home-tag { font-family: var(--serif); font-style: italic; font-size: 1.35rem; color: var(--paper-2); margin-bottom: 36px; }
 .home-actions { display: grid; gap: 12px; }

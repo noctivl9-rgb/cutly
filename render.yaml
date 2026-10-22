@@ -6,6 +6,7 @@ services:
     runtime: node
     plan: free # une seule instance : la diffusion temps réel est en mémoire (voir docs/deploiement.md)
     region: frankfurt
+    branch: dossier-x
     buildCommand: npm ci --omit=dev
     startCommand: node src/server.ts
     healthCheckPath: /api/health
@@ -15,11 +16,12 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DX_ADMIN_EMAIL
-        sync: false
+        value: admin@dossier-x.fr
+      # Mot de passe administrateur généré par Render : consultable dans Environment.
       - key: DX_ADMIN_PASSWORD
-        sync: false
+        generateValue: true
       - key: PUBLIC_BASE_URL
-        sync: false
+        value: https://dossier-x.onrender.com
       - key: PRINT_DOMAIN_CONFIRMED
         value: "false"
       - key: TRUST_PROXY
